@@ -1,0 +1,41 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: agent-environment
+spec:
+  compositeTypeRef:
+    apiVersion: platform.example.org/v1alpha1
+    kind: XAgentEnvironment
+  mode: Pipeline
+  pipeline:
+  - step: render-opentofu-workspace
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          apiVersion: opentofu.m.upbound.io/v1beta1
+          kind: Workspace
+          metadata:
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: opentofu-workspace
+          spec:
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: provider-opentofu
+            forProvider:
+              source: Remote
+              module: github.com/pauldotyu/crossplane-opentofu-demo//modules/resource-group?ref=main
+              vars:
+              - key: resource_group_name
+                value: {{ .observed.composite.resource.spec.parameters.name | quote }}
+              - key: location
+                value: {{ .observed.composite.resource.spec.parameters.location | quote }}
+              - key: requester_object_id
+                value: {{ .observed.composite.resource.spec.parameters.requesterObjectId | quote }}
+  - step: automatically-detect-ready
+    functionRef:
+      name: function-auto-ready
