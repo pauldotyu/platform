@@ -23,15 +23,23 @@ spec:
               parameters:
                 type: object
                 required:
-                - name
+                - team
+                - project
+                - environment
                 - location
                 - requesterObjectId
+                - costCenter
                 properties:
-                  name:
+                  team:
                     type: string
-                    pattern: '^[a-z0-9-]{1,60}$'
+                  project:
+                    type: string
+                  environment:
+                    type: string
                   location:
                     type: string
                   requesterObjectId:
                     type: string
                     minLength: 1
+                  costCenter:
+                    type: string

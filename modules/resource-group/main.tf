@@ -7,11 +7,23 @@ terraform {
   }
 }
 
-variable "resource_group_name" {
+variable "team" {
+  type = string
+}
+
+variable "project" {
+  type = string
+}
+
+variable "environment" {
   type = string
 }
 
 variable "location" {
+  type = string
+}
+
+variable "cost_center" {
   type = string
 }
 
@@ -25,13 +37,19 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "this" {
-  name     = var.resource_group_name
+  name     = "rg-${var.team}-${var.project}-${var.environment}"
   location = var.location
+  tags = {
+    team        = var.team
+    project     = var.project
+    environment = var.environment
+    costCenter  = var.cost_center
+  }
 }
 
 resource "azurerm_role_assignment" "requester_contributor" {
   scope                = azurerm_resource_group.this.id
-  role_definition_name = "Contributor"
+  role_definition_name = "Owner"
   principal_id         = var.requester_object_id
 }
 

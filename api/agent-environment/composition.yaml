@@ -30,12 +30,18 @@ spec:
               source: Remote
               module: github.com/pauldotyu/crossplane-opentofu-demo//modules/resource-group?ref=main
               vars:
-              - key: resource_group_name
-                value: {{ .observed.composite.resource.spec.parameters.name | quote }}
+              - key: team
+                value: {{ .observed.composite.resource.spec.parameters.team | quote }}
+              - key: project
+                value: {{ .observed.composite.resource.spec.parameters.project | quote }}
+              - key: environment
+                value: {{ .observed.composite.resource.spec.parameters.environment | quote }}
               - key: location
                 value: {{ .observed.composite.resource.spec.parameters.location | quote }}
               - key: requester_object_id
                 value: {{ .observed.composite.resource.spec.parameters.requesterObjectId | quote }}
+              - key: cost_center
+                value: {{ .observed.composite.resource.spec.parameters.costCenter | quote }}
   - step: automatically-detect-ready
     functionRef:
       name: function-auto-ready
