@@ -1,0 +1,13 @@
+apiVersion: platform.example.org/v1alpha1
+kind: XAgentEnvironment
+metadata:
+  name: blue-sundae-funday-dev
+  namespace: blue
+spec:
+  parameters:
+    team: "blue"
+    project: "sundae-funday"
+    environment: "dev"
+    location: "westus3"
+    costCenter: "cc-143"
+    requesterObjectId: "7002a869-11f9-4ac2-8cad-c16a09128b02"
