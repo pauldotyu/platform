@@ -8,6 +8,17 @@ spec:
     kind: XAgentEnvironment
   mode: Pipeline
   pipeline:
+  - step: environment
+    functionRef:
+      name: function-environment-configs
+    input:
+      apiVersion: environmentconfigs.fn.crossplane.io/v1beta1
+      kind: Input
+      spec:
+        environmentConfigs:
+          - type: Reference
+            ref:
+              name: workload
   - step: render-opentofu-workspace
     functionRef:
       name: function-go-templating
@@ -17,6 +28,7 @@ spec:
       source: Inline
       inline:
         template: |
+          {{- $env := index .context "apiextensions.crossplane.io/environment" }}
           apiVersion: opentofu.m.upbound.io/v1beta1
           kind: Workspace
           metadata:
@@ -28,7 +40,7 @@ spec:
               name: provider-opentofu
             forProvider:
               source: Remote
-              module: github.com/pauldotyu/platform//modules/resource-group?ref=main
+              module: github.com/pauldotyu/platform//modules/agent-environment?ref=main
               vars:
               - key: team
                 value: {{ .observed.composite.resource.spec.parameters.team | quote }}
@@ -42,6 +54,10 @@ spec:
                 value: {{ .observed.composite.resource.spec.parameters.requesterObjectId | quote }}
               - key: cost_center
                 value: {{ .observed.composite.resource.spec.parameters.costCenter | quote }}
+              - key: workload_cluster_id
+                value: {{ $env.clusterId | quote }}
+              - key: workload_cluster_location
+                value: {{ $env.location | quote }}
           {{- $workspace := getComposedResource . "opentofu-workspace" }}
           {{- $resourceGroupId := dig "status" "atProvider" "outputs" "resource_group_id" "" ($workspace | default (dict)) }}
           {{- if $resourceGroupId }}
