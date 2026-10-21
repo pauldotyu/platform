@@ -54,19 +54,32 @@ spec:
                 value: {{ .observed.composite.resource.spec.parameters.requesterObjectId | quote }}
               - key: cost_center
                 value: {{ .observed.composite.resource.spec.parameters.costCenter | quote }}
-              - key: workload_cluster_id
+              - key: shared_cluster_id
                 value: {{ $env.clusterId | quote }}
-              - key: workload_cluster_location
+              - key: shared_cluster_oidc_issuer_url
+                value: {{ $env.clusterOidcIssuerUrl | quote }}
+              - key: shared_cluster_location
                 value: {{ $env.location | quote }}
               - key: shared_monitor_workspace_id
                 value: {{ $env.monitorWorkspaceId | quote }}
               - key: shared_log_analytics_workspace_id
                 value: {{ $env.logAnalyticsWorkspaceId | quote }}
+              - key: shared_model_resource_id
+                value: {{ $env.modelResourceId | quote }}
+              - key: shared_model_resource_name
+                value: {{ $env.modelResourceName | quote }}
+          
           {{- $workspace := getComposedResource . "opentofu-workspace" }}
+          {{- $outputs := dig "status" "atProvider" "outputs" (dict) ($workspace | default (dict)) }}
+          {{- $namespace := get $outputs "namespace_name" }}
+          {{- $clientId := get $outputs "workload_identity_client_id" }}
+          {{- $serviceAccountName := get $outputs "foundry_service_account_name" }}
           {{- $resourceGroupId := dig "status" "atProvider" "outputs" "resource_group_id" "" ($workspace | default (dict)) }}
           {{- $logsEndpoint := dig "status" "atProvider" "outputs" "otel_logs_endpoint" "" ($workspace | default (dict)) }}
           {{- $metricsEndpoint := dig "status" "atProvider" "outputs" "otel_metrics_endpoint" "" ($workspace | default (dict)) }}
           {{- $tracesEndpoint := dig "status" "atProvider" "outputs" "otel_traces_endpoint" "" ($workspace | default (dict)) }}
+          {{- $modelEndpoint := dig "status" "atProvider" "outputs" "foundry_openai_base_url" "" ($workspace | default (dict)) }}
+
           {{- if and $resourceGroupId $logsEndpoint $metricsEndpoint $tracesEndpoint }}
           ---
           apiVersion: platform.example.org/v1alpha1
@@ -76,6 +89,36 @@ spec:
             logsEndpoint: {{ $logsEndpoint | quote }}
             metricsEndpoint: {{ $metricsEndpoint | quote }}
             tracesEndpoint: {{ $tracesEndpoint | quote }}
+            modelEndpoint: {{ $modelEndpoint | quote }}
+            serviceAccountName: {{ $serviceAccountName | quote }}
+            namespace: {{ $namespace | quote }}
+            clientId: {{ $clientId | quote }}
+          {{- end }}
+
+          {{- $observed := .observed.resources | default (dict) }}
+          {{- $workspaceReady := eq (getResourceCondition "Ready" (get $observed "opentofu-workspace")).Status "True" }}
+          {{- $existingSA := getComposedResource . "workload-service-account" }}
+          
+          {{- if and $namespace $clientId $serviceAccountName (or $workspaceReady $existingSA) }}
+          ---
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: workload-service-account
+          spec:
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: workload-kubernetes
+            forProvider:
+              manifest:
+                apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: {{ $serviceAccountName | quote }}
+                  namespace: {{ $namespace | quote }}
+                  annotations:
+                    azure.workload.identity/client-id: {{ $clientId | quote }}
           {{- end }}
   - step: automatically-detect-ready
     functionRef:

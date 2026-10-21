@@ -40,7 +40,11 @@ variable "workload_cluster_id" {
   type = string
 }
 
-variable "workload_cluster_location" {
+variable "shared_cluster_oidc_issuer_url" {
+  type = string
+}
+
+variable "shared_cluster_location" {
   type = string
 }
 
@@ -52,6 +56,14 @@ variable "shared_log_analytics_workspace_id" {
   type = string
 }
 
+variable "shared_model_resource_id" {
+  type = string
+}
+
+variable "shared_model_resource_name" {
+  type = string
+}
+
 provider "azurerm" {
   features {}
   use_oidc = true
@@ -59,8 +71,13 @@ provider "azurerm" {
 
 data "azurerm_client_config" "current" {}
 
+locals {
+  namespace                    = "${var.team}-${var.project}-${var.environment}"
+  foundry_service_account_name = "foundry"
+}
+
 resource "azurerm_resource_group" "this" {
-  name     = "rg-${var.team}-${var.project}-${var.environment}"
+  name     = "rg-${local.namespace}"
   location = var.location
   tags = {
     team        = var.team
@@ -72,7 +89,7 @@ resource "azurerm_resource_group" "this" {
 
 resource "azapi_resource" "otel" {
   type      = "Microsoft.Insights/components@2025-01-23-preview"
-  name      = "otel-${var.team}-${var.project}-${var.environment}"
+  name      = "otel-${local.namespace}"
   parent_id = azurerm_resource_group.this.id
   location  = azurerm_resource_group.this.location
 
@@ -81,7 +98,7 @@ resource "azapi_resource" "otel" {
   body = {
     kind = "web"
     properties = {
-      ApplicationId                      = "otel-${var.team}-${var.project}-${var.environment}"
+      ApplicationId                      = "otel-${local.namespace}"
       Application_Type                   = "web"
       Flow_Type                          = "Redfield"
       Request_Source                     = "IbizaAIExtension"
@@ -100,12 +117,11 @@ resource "azapi_resource" "otel" {
 }
 
 // https://learn.microsoft.com/azure/templates/microsoft.containerservice/managedclusters/managednamespaces?pivots=deployment-language-terraform
-resource "azapi_resource" "managed_namespace" {
+resource "azapi_resource" "namespace" {
   type      = "Microsoft.ContainerService/managedClusters/managedNamespaces@2026-03-02-preview"
   parent_id = var.workload_cluster_id
-  location  = var.workload_cluster_location
-  tags      = azurerm_resource_group.this.tags
-  name      = var.team
+  location  = var.shared_cluster_location
+  name      = local.namespace
 
   // this required when azapi local schema check isn't aware of the latest api version
   schema_validation_enabled = false
@@ -138,36 +154,62 @@ resource "azapi_resource" "managed_namespace" {
   }
 }
 
-resource "azurerm_role_assignment" "requester_contributor" {
+resource "azurerm_role_assignment" "requester_resource_group_owner" {
   scope                = azurerm_resource_group.this.id
   role_definition_name = "Owner"
   principal_id         = var.requester_object_id
 }
 
-resource "azurerm_role_assignment" "managed_namespace_user" {
+resource "azurerm_role_assignment" "requester_namespace_user" {
   principal_id         = var.requester_object_id
   role_definition_name = "Azure Kubernetes Service Namespace User"
-  scope                = azapi_resource.managed_namespace.id
+  scope                = azapi_resource.namespace.id
 }
 
-resource "azurerm_role_assignment" "cluster_rbac_writer" {
+resource "azurerm_role_assignment" "requester_cluster_rbac_writer" {
   principal_id         = var.requester_object_id
   role_definition_name = "Azure Kubernetes Service RBAC Writer"
   scope                = var.workload_cluster_id
 }
 
-resource "azurerm_role_assignment" "cluster_user" {
+resource "azurerm_role_assignment" "requester_cluster_user" {
   principal_id         = var.requester_object_id
   role_definition_name = "Azure Kubernetes Service Cluster User Role"
   scope                = var.workload_cluster_id
+}
+
+resource "azurerm_user_assigned_identity" "foundry" {
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  name                = "mi-${var.team}-${var.project}-${var.environment}"
+}
+
+resource "azurerm_role_assignment" "requester_foundry_user" {
+  principal_id         = var.requester_object_id
+  role_definition_name = "Cognitive Services OpenAI User"
+  scope                = var.shared_model_resource_id
+}
+
+resource "azurerm_role_assignment" "foundry_user" {
+  principal_id         = azurerm_user_assigned_identity.foundry.principal_id
+  role_definition_name = "Cognitive Services OpenAI User"
+  scope                = var.shared_model_resource_id
+}
+
+resource "azurerm_federated_identity_credential" "foundry" {
+  user_assigned_identity_id = azurerm_user_assigned_identity.foundry.id
+  name                      = "${var.team}-${var.project}-${var.environment}"
+  issuer                    = var.shared_cluster_oidc_issuer_url
+  audience                  = ["api://AzureADTokenExchange"]
+  subject                   = "system:serviceaccount:${var.team}-${var.project}-${var.environment}:${local.foundry_service_account_name}"
 }
 
 output "resource_group_id" {
   value = azurerm_resource_group.this.id
 }
 
-output "managed_namespace_id" {
-  value = azapi_resource.managed_namespace.id
+output "namespace_name" {
+  value = azapi_resource.namespace.name
 }
 
 output "otel_logs_endpoint" {
@@ -183,4 +225,17 @@ output "otel_metrics_endpoint" {
 output "otel_traces_endpoint" {
   description = "The endpoint for OpenTelemetry traces"
   value       = azapi_resource.otel.output.properties.OTLPTracesEndpoint
+}
+
+output "foundry_openai_base_url" {
+  description = "The OpenAI v1 base URL for the Foundry account."
+  value       = "https://${var.shared_model_resource_name}.services.ai.azure.com/openai/v1/"
+}
+
+output "foundry_service_account_name" {
+  value = local.foundry_service_account_name
+}
+
+output "workload_identity_client_id" {
+  value = azurerm_user_assigned_identity.foundry.client_id
 }

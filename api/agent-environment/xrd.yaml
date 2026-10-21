@@ -60,3 +60,17 @@ spec:
             properties:
               resourceGroupId:
                 type: string
+              logsEndpoint:
+                type: string
+              metricsEndpoint:
+                type: string
+              tracesEndpoint:
+                type: string
+              modelEndpoint:
+                type: string
+              serviceAccountName:
+                type: string
+              namespace:
+                type: string
+              clientId:
+                type: string
