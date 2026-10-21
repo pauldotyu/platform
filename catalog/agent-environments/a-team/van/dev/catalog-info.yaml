@@ -13,6 +13,8 @@ metadata:
   links:
     - url: https://github.com/pauldotyu/crossplane-opentofu-demo/blob/main/requests/agent-environments/a-team/van/dev/environment.yaml
       title: Environment request
+    - url: https://backstage.paulyu.rocks/create/templates/default/delete-agent-environment?formData=%7B%22team%22%3A%22a-team%22%2C%22project%22%3A%22van%22%2C%22environment%22%3A%22dev%22%7D
+      title: Request deletion
 spec:
   type: agent-environment
   owner: "user:default/paul_yucancloud.com"
