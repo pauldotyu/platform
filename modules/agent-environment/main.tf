@@ -103,8 +103,8 @@ resource "azapi_resource" "otel" {
       Flow_Type                          = "Redfield"
       Request_Source                     = "IbizaAIExtension"
       IngestionMode                      = "LogAnalytics"
-      WorkspaceResourceId                = var.shared_monitor_workspace_id
-      AzureMonitorWorkspaceResourceId    = var.shared_log_analytics_workspace_id
+      WorkspaceResourceId                = var.shared_log_analytics_workspace_id
+      AzureMonitorWorkspaceResourceId    = var.shared_monitor_workspace_id
       AzureMonitorWorkspaceIngestionMode = "Enabled"
       publicNetworkAccessForIngestion    = "Enabled"
       publicNetworkAccessForQuery        = "Enabled"
