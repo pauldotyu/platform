@@ -1,0 +1,13 @@
+apiVersion: platform.example.org/v1alpha1
+kind: XAgentEnvironment
+metadata:
+  name: t1-p1-dev
+  namespace: agent-environments
+spec:
+  parameters:
+    team: "t1"
+    project: "p1"
+    environment: "dev"
+    location: "westus3"
+    costCenter: "cc-t1"
+    requesterObjectId: "7002a869-11f9-4ac2-8cad-c16a09128b02"
