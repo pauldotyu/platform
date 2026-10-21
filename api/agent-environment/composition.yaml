@@ -42,6 +42,15 @@ spec:
                 value: {{ .observed.composite.resource.spec.parameters.requesterObjectId | quote }}
               - key: cost_center
                 value: {{ .observed.composite.resource.spec.parameters.costCenter | quote }}
+          {{- $workspace := getComposedResource . "opentofu-workspace" }}
+          {{- $resourceGroupId := dig "status" "atProvider" "outputs" "resource_group_id" "" ($workspace | default (dict)) }}
+          {{- if $resourceGroupId }}
+          ---
+          apiVersion: platform.example.org/v1alpha1
+          kind: XAgentEnvironment
+          status:
+            resourceGroupId: {{ $resourceGroupId | quote }}
+          {{- end }}
   - step: automatically-detect-ready
     functionRef:
       name: function-auto-ready

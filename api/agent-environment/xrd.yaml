@@ -3,6 +3,7 @@ kind: CompositeResourceDefinition
 metadata:
   name: xagentenvironments.platform.example.org
 spec:
+  scope: Namespaced
   group: platform.example.org
   names:
     kind: XAgentEnvironment
@@ -32,14 +33,30 @@ spec:
                 properties:
                   team:
                     type: string
+                    minLength: 1
+                    maxLength: 20
+                    pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
                   project:
                     type: string
+                    minLength: 1
+                    maxLength: 20
+                    pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
                   environment:
                     type: string
+                    minLength: 1
+                    maxLength: 20
+                    pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
                   location:
                     type: string
+                    minLength: 1
                   requesterObjectId:
                     type: string
-                    minLength: 1
+                    pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
                   costCenter:
                     type: string
+                    minLength: 1
+          status:
+            type: object
+            properties:
+              resourceGroupId:
+                type: string
