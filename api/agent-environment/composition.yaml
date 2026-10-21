@@ -58,14 +58,24 @@ spec:
                 value: {{ $env.clusterId | quote }}
               - key: workload_cluster_location
                 value: {{ $env.location | quote }}
+              - key: shared_monitor_workspace_id
+                value: {{ $env.monitorWorkspaceId | quote }}
+              - key: shared_log_analytics_workspace_id
+                value: {{ $env.logAnalyticsWorkspaceId | quote }}
           {{- $workspace := getComposedResource . "opentofu-workspace" }}
           {{- $resourceGroupId := dig "status" "atProvider" "outputs" "resource_group_id" "" ($workspace | default (dict)) }}
-          {{- if $resourceGroupId }}
+          {{- $logsEndpoint := dig "status" "atProvider" "outputs" "otel_logs_endpoint" "" ($workspace | default (dict)) }}
+          {{- $metricsEndpoint := dig "status" "atProvider" "outputs" "otel_metrics_endpoint" "" ($workspace | default (dict)) }}
+          {{- $tracesEndpoint := dig "status" "atProvider" "outputs" "otel_traces_endpoint" "" ($workspace | default (dict)) }}
+          {{- if and $resourceGroupId $logsEndpoint $metricsEndpoint $tracesEndpoint }}
           ---
           apiVersion: platform.example.org/v1alpha1
           kind: XAgentEnvironment
           status:
             resourceGroupId: {{ $resourceGroupId | quote }}
+            logsEndpoint: {{ $logsEndpoint | quote }}
+            metricsEndpoint: {{ $metricsEndpoint | quote }}
+            tracesEndpoint: {{ $tracesEndpoint | quote }}
           {{- end }}
   - step: automatically-detect-ready
     functionRef:
