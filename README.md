@@ -1,4 +1,4 @@
-# Crossplane + OpenTofu on Azure Demo
+# Platform Engineering Demo with Crossplane + OpenTofu on Azure
 
 Provision Azure environments through a Backstage request, Git approval, Argo CD,
 Crossplane, and the OpenTofu provider.
@@ -78,7 +78,7 @@ metadata:
 spec:
   description: Approved agent environment requests
   sourceRepos:
-    - https://github.com/pauldotyu/crossplane-opentofu-demo.git
+    - https://github.com/pauldotyu/platform.git
   destinations:
     - server: https://kubernetes.default.svc
       namespace: agent-environments
@@ -95,7 +95,7 @@ metadata:
 spec:
   project: agent-environments
   source:
-    repoURL: https://github.com/pauldotyu/crossplane-opentofu-demo.git
+    repoURL: https://github.com/pauldotyu/platform.git
     targetRevision: main
     path: requests
     directory:

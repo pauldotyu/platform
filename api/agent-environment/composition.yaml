@@ -28,7 +28,7 @@ spec:
               name: provider-opentofu
             forProvider:
               source: Remote
-              module: github.com/pauldotyu/crossplane-opentofu-demo//modules/resource-group?ref=main
+              module: github.com/pauldotyu/platform//modules/resource-group?ref=main
               vars:
               - key: team
                 value: {{ .observed.composite.resource.spec.parameters.team | quote }}

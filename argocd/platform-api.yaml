@@ -6,7 +6,7 @@ metadata:
 spec:
   description: Crossplane platform API definitions
   sourceRepos:
-    - https://github.com/pauldotyu/crossplane-opentofu-demo.git
+    - https://github.com/pauldotyu/platform.git
   destinations:
     - server: https://kubernetes.default.svc
       namespace: crossplane-system
@@ -27,7 +27,7 @@ metadata:
 spec:
   project: platform-api
   source:
-    repoURL: https://github.com/pauldotyu/crossplane-opentofu-demo.git
+    repoURL: https://github.com/pauldotyu/platform.git
     targetRevision: main
     path: api
     directory:

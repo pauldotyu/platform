@@ -11,7 +11,7 @@ metadata:
 spec:
   description: Approved agent environment requests
   sourceRepos:
-    - https://github.com/pauldotyu/crossplane-opentofu-demo.git
+    - https://github.com/pauldotyu/platform.git
   destinations:
     - server: https://kubernetes.default.svc
       namespace: agent-environments
@@ -28,7 +28,7 @@ metadata:
 spec:
   project: agent-environments
   source:
-    repoURL: https://github.com/pauldotyu/crossplane-opentofu-demo.git
+    repoURL: https://github.com/pauldotyu/platform.git
     targetRevision: main
     path: requests/agent-environments
     directory:
