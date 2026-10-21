@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: a-team-van-dev
+  description: Agent environment requested through Backstage
+  labels:
+    team: "a-team"
+    project: "van"
+    environment: "dev"
+    region: "westus3"
+  annotations:
+    backstage.io/source-template: template:default/create-agent-environment
+  links:
+    - url: https://github.com/pauldotyu/crossplane-opentofu-demo/blob/main/requests/agent-environments/a-team/van/dev/environment.yaml
+      title: Environment request
+spec:
+  type: agent-environment
+  owner: "user:default/paul_yucancloud.com"
