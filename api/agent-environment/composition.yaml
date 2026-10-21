@@ -54,7 +54,7 @@ spec:
                 value: {{ .observed.composite.resource.spec.parameters.requesterObjectId | quote }}
               - key: cost_center
                 value: {{ .observed.composite.resource.spec.parameters.costCenter | quote }}
-              - key: shared_cluster_id
+              - key: workload_cluster_id
                 value: {{ $env.clusterId | quote }}
               - key: shared_cluster_oidc_issuer_url
                 value: {{ $env.clusterOidcIssuerUrl | quote }}
