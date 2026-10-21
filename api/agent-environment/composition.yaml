@@ -96,7 +96,7 @@ spec:
           {{- end }}
 
           {{- $observed := .observed.resources | default (dict) }}
-          {{- $workspaceReady := eq (getResourceCondition "Ready" (get $observed "opentofu-workspace")).Status "True" }}
+          {{- $workspaceReady := eq (getResourceCondition "Ready" (get $observed "opentofu-workspace" | default (dict))).Status "True" }}
           {{- $existingSA := getComposedResource . "workload-service-account" }}
           
           {{- if and $namespace $clientId $serviceAccountName (or $workspaceReady $existingSA) }}
