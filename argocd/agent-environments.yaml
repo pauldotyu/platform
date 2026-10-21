@@ -30,7 +30,7 @@ spec:
   source:
     repoURL: https://github.com/pauldotyu/crossplane-opentofu-demo.git
     targetRevision: main
-    path: requests
+    path: requests/agent-environments
     directory:
       recurse: true
   destination:
