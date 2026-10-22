@@ -10,6 +10,8 @@ metadata:
     region: "westus3"
   annotations:
     backstage.io/source-template: template:default/create-agent-environment
+    backstage.io/kubernetes-namespace: agent-environments
+    backstage.io/kubernetes-label-selector: crossplane.io/composite=t1-p1-dev
   links:
     - url: https://github.com/pauldotyu/platform/blob/main/requests/agent-environments/t1/p1/dev/environment.yaml
       title: Environment request
