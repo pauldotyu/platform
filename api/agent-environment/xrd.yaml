@@ -58,19 +58,35 @@ spec:
           status:
             type: object
             properties:
+              provisioned:
+                type: boolean
+                description: True only when Azure resources are applied, every output is present, and the workload ServiceAccount exists.
+              waitingFor:
+                type: array
+                description: What provisioning is still waiting on. Empty when provisioned.
+                items:
+                  type: string
               resourceGroupId:
                 type: string
+                description: The ID of the Azure resource group associated with this environment.
               logsEndpoint:
                 type: string
+                description: The endpoint for accessing logs related to this environment.
               metricsEndpoint:
                 type: string
+                description: The endpoint for accessing metrics related to this environment.
               tracesEndpoint:
                 type: string
+                description: The endpoint for accessing traces related to this environment.
               modelEndpoint:
                 type: string
+                description: The endpoint for accessing the model related to this environment.
               serviceAccountName:
                 type: string
+                description: The name of the workload ServiceAccount associated with this environment.
               namespace:
                 type: string
+                description: The namespace in which the workload resources are deployed.
               clientId:
                 type: string
+                description: The client ID used for authentication with Azure resources.

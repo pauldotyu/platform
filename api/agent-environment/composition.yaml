@@ -71,37 +71,34 @@ spec:
               - key: shared_model_resource_name
                 value: {{ $env.modelResourceName | quote }}
           
-          {{- $workspace := getComposedResource . "opentofu-workspace" }}
-          {{- $outputs := dig "status" "atProvider" "outputs" (dict) ($workspace | default (dict)) }}
-          {{- $namespace := get $outputs "namespace_name" }}
-          {{- $clientId := get $outputs "workload_identity_client_id" }}
-          {{- $serviceAccountName := get $outputs "foundry_service_account_name" }}
-          {{- $resourceGroupId := dig "status" "atProvider" "outputs" "resource_group_id" "" ($workspace | default (dict)) }}
-          {{- $logsEndpoint := dig "status" "atProvider" "outputs" "otel_logs_endpoint" "" ($workspace | default (dict)) }}
-          {{- $metricsEndpoint := dig "status" "atProvider" "outputs" "otel_metrics_endpoint" "" ($workspace | default (dict)) }}
-          {{- $tracesEndpoint := dig "status" "atProvider" "outputs" "otel_traces_endpoint" "" ($workspace | default (dict)) }}
-          {{- $modelEndpoint := dig "status" "atProvider" "outputs" "foundry_openai_base_url" "" ($workspace | default (dict)) }}
-
-          {{- if and $resourceGroupId $logsEndpoint $metricsEndpoint $tracesEndpoint }}
-          ---
-          apiVersion: platform.example.org/v1alpha1
-          kind: XAgentEnvironment
-          status:
-            resourceGroupId: {{ $resourceGroupId | quote }}
-            logsEndpoint: {{ $logsEndpoint | quote }}
-            metricsEndpoint: {{ $metricsEndpoint | quote }}
-            tracesEndpoint: {{ $tracesEndpoint | quote }}
-            modelEndpoint: {{ $modelEndpoint | quote }}
-            serviceAccountName: {{ $serviceAccountName | quote }}
-            namespace: {{ $namespace | quote }}
-            clientId: {{ $clientId | quote }}
+          {{- $workspace := getComposedResource . "opentofu-workspace" | default (dict) }}
+          {{- $outputs := dig "status" "atProvider" "outputs" (dict) $workspace }}
+          {{- $workspaceReady := false }}
+          {{- $workspaceSynced := false }}
+          {{- range (dig "status" "conditions" (list) $workspace) }}
+            {{- if and (eq .type "Ready") (eq .status "True") }}{{ $workspaceReady = true }}{{ end }}
+            {{- if and (eq .type "Synced") (eq .status "True") }}{{ $workspaceSynced = true }}{{ end }}
           {{- end }}
-
-          {{- $observed := .observed.resources | default (dict) }}
-          {{- $workspaceReady := eq (getResourceCondition "Ready" (get $observed "opentofu-workspace" | default (dict))).Status "True" }}
+          {{- $required := list "resource_group_id" "namespace_name" "workload_identity_client_id" "foundry_service_account_name" "foundry_openai_base_url" "otel_logs_endpoint" "otel_metrics_endpoint" "otel_traces_endpoint" }}
+          {{- $waiting := list }}
+          {{- if not $workspaceSynced }}{{ $waiting = append $waiting "workspace: not synced" }}{{ end }}
+          {{- if not $workspaceReady }}{{ $waiting = append $waiting "workspace: not ready" }}{{ end }}
+          {{- range $required }}
+            {{- if eq (dig . "" $outputs) "" }}{{ $waiting = append $waiting (printf "output: %s" .) }}{{ end }}
+          {{- end }}
+          {{- $azureReady := eq (len $waiting) 0 }}
+          {{- $namespace := dig "namespace_name" "" $outputs }}
+          {{- $clientId := dig "workload_identity_client_id" "" $outputs }}
+          {{- $serviceAccountName := dig "foundry_service_account_name" "" $outputs }}
           {{- $existingSA := getComposedResource . "workload-service-account" }}
-          
-          {{- if and $namespace $clientId $serviceAccountName (or $workspaceReady $existingSA) }}
+          {{- $saReady := false }}
+          {{- range (dig "status" "conditions" (list) ($existingSA | default (dict))) }}
+            {{- if and (eq .type "Ready") (eq .status "True") }}{{ $saReady = true }}{{ end }}
+          {{- end }}
+          {{- if not $saReady }}{{ $waiting = append $waiting "serviceaccount: not ready" }}{{ end }}
+
+          {{- /* Keep the SA once created so a transient Workspace blip never deletes it. */}}
+          {{- if or $azureReady $existingSA }}
           ---
           apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
@@ -122,6 +119,22 @@ spec:
                   annotations:
                     azure.workload.identity/client-id: {{ $clientId | quote }}
           {{- end }}
+          ---
+          apiVersion: platform.example.org/v1alpha1
+          kind: XAgentEnvironment
+          status:
+            provisioned: {{ eq (len $waiting) 0 }}
+            waitingFor: {{ $waiting | toJson }}
+            {{- if $azureReady }}
+            resourceGroupId: {{ dig "resource_group_id" "" $outputs | quote }}
+            namespace: {{ $namespace | quote }}
+            clientId: {{ $clientId | quote }}
+            serviceAccountName: {{ $serviceAccountName | quote }}
+            modelEndpoint: {{ dig "foundry_openai_base_url" "" $outputs | quote }}
+            logsEndpoint: {{ dig "otel_logs_endpoint" "" $outputs | quote }}
+            metricsEndpoint: {{ dig "otel_metrics_endpoint" "" $outputs | quote }}
+            tracesEndpoint: {{ dig "otel_traces_endpoint" "" $outputs | quote }}
+            {{- end }}
   - step: automatically-detect-ready
     functionRef:
       name: function-auto-ready
