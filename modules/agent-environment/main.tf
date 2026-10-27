@@ -13,56 +13,115 @@ terraform {
   }
 }
 
+# Request variables
 variable "team" {
-  type = string
+  type        = string
+  description = "Requesting team. First segment of the namespace and resource group name."
+  validation {
+    condition     = can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", var.team)) && length(var.team) <= 20
+    error_message = "team must be lowercase letters, digits, and single hyphens, at most 20 characters."
+  }
 }
 
 variable "project" {
-  type = string
+  type        = string
+  description = "Project name. Second segment of the namespace and resource group name."
+  validation {
+    condition     = can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", var.project)) && length(var.project) <= 20
+    error_message = "project must be lowercase letters, digits, and single hyphens, at most 20 characters."
+  }
 }
 
 variable "environment" {
-  type = string
+  type        = string
+  description = "Environment name, for example dev or prod."
+  validation {
+    condition     = can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", var.environment)) && length(var.environment) <= 20
+    error_message = "environment must be lowercase letters, digits, and single hyphens, at most 20 characters."
+  }
 }
 
 variable "location" {
-  type = string
+  type        = string
+  description = "Azure region for the environment's resource group. Must match a region offered by the Backstage template."
+  validation {
+    condition     = contains(["westus3", "eastus", "centralus"], var.location)
+    error_message = "location must be one of: westus3, eastus, centralus."
+  }
 }
 
 variable "cost_center" {
-  type = string
+  type        = string
+  description = "Cost center tag applied to every resource."
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$", var.cost_center)) && length(var.cost_center) <= 20
+    error_message = "cost_center must be letters, digits, and single hyphens, at most 20 characters."
+  }
 }
 
 variable "requester_object_id" {
-  type = string
+  type        = string
+  description = "Entra object ID of the requester. Receives RG Owner, namespace, and model access."
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.requester_object_id)) && var.requester_object_id != "00000000-0000-0000-0000-000000000000"
+    error_message = "requester_object_id must be a real Entra object ID, not the placeholder."
+  }
 }
 
+# Platform variables
 variable "workload_cluster_id" {
-  type = string
+  type        = string
+  description = "ID of the workload cluster."
+  validation {
+    condition     = can(regex("(?i)^/subscriptions/[0-9a-f-]{36}/resourceGroups/[^/]+/providers/Microsoft.ContainerService/managedClusters/[^/]+$", var.workload_cluster_id))
+    error_message = "workload_cluster_id must be a valid Azure managed cluster resource ID."
+  }
 }
 
 variable "shared_cluster_oidc_issuer_url" {
-  type = string
+  type        = string
+  description = "OIDC issuer URL of the shared cluster."
+  validation {
+    condition     = startswith(var.shared_cluster_oidc_issuer_url, "https://")
+    error_message = "shared_cluster_oidc_issuer_url must be a valid URL."
+  }
 }
 
 variable "shared_cluster_location" {
-  type = string
+  type        = string
+  description = "Location of the shared cluster."
 }
 
 variable "shared_monitor_workspace_id" {
-  type = string
+  type        = string
+  description = "Resource ID of the shared monitor workspace."
+  validation {
+    condition     = can(regex("(?i)/providers/Microsoft.Monitor/accounts/[^/]+$", var.shared_monitor_workspace_id))
+    error_message = "shared_monitor_workspace_id must be a valid Azure resource ID."
+  }
 }
 
 variable "shared_log_analytics_workspace_id" {
-  type = string
+  type        = string
+  description = "Resource ID of the shared Log Analytics workspace."
+  validation {
+    condition     = can(regex("(?i)/providers/Microsoft.OperationalInsights/workspaces/[^/]+$", var.shared_log_analytics_workspace_id))
+    error_message = "shared_log_analytics_workspace_id must be a valid Azure resource ID."
+  }
 }
 
 variable "shared_model_resource_id" {
-  type = string
+  type        = string
+  description = "Resource ID of the shared model."
+  validation {
+    condition     = can(regex("(?i)/providers/Microsoft.CognitiveServices/accounts/[^/]+$", var.shared_model_resource_id))
+    error_message = "shared_model_resource_id must be a valid Azure resource ID."
+  }
 }
 
 variable "shared_model_resource_name" {
-  type = string
+  type        = string
+  description = "Name of the shared model resource."
 }
 
 provider "azurerm" {
@@ -155,6 +214,13 @@ resource "azapi_resource" "namespace" {
         "aks-desktop/project-subscription"   = data.azurerm_client_config.current.subscription_id
         "aks-desktop/project-resource-group" = azurerm_resource_group.this.name
       }
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition     = !startswith(local.namespace, "kube-") && !contains(["default", "argocd", "crossplane-system", "agent-environments", "app-routing-system", "aks-istio-system", "gatekeeper-system", "cert-manager", "backstage"], local.namespace)
+      error_message = "The namespace ${local.namespace} is reserved for the platform. Choose a different team, project, or environment."
     }
   }
 }
