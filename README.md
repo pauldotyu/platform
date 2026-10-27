@@ -227,6 +227,25 @@ errors, then confirm the Azure resource group's name, region, tags, and role
 assignment. Verify a second environment works without GitOps configuration
 changes.
 
+## Use your environment
+
+The following snippet demonstrates how to configure a pod to use the environment's service account and platform context ConfigMap:
+
+```yaml
+spec:
+  template:
+    metadata:
+      labels:
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: foundry            # a key from status.binding.serviceAccounts
+      containers:
+        - name: agent
+          envFrom:
+            - configMapRef:
+                name: platform-context       # status.binding.configMapName
+```
+
 ## Updates and teardown
 
 Treat the team/project/environment tuple as the environment's identity. Update

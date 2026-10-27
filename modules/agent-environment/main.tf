@@ -339,3 +339,12 @@ output "agent_client_ids" {
   description = "ServiceAccount name to managed identity client ID."
   value       = { for a, id in azurerm_user_assigned_identity.agent : a => id.client_id }
 }
+
+output "app_insights_resource_id" {
+  value = azapi_resource.otel.id
+}
+
+output "app_insights_application_id" {
+  description = "Application Insights AppId, sent as microsoft.applicationId on OTLP resource attributes."
+  value       = azapi_resource.otel.output.properties.AppId
+}

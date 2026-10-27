@@ -69,6 +69,26 @@ spec:
           status:
             type: object
             properties:
+              binding:
+                type: string
+                description: Everything an application needs to run in this environment. Present only when provisioned is true.
+                properties:
+                  namespace:
+                    type: string
+                    description: The namespace in which the workload resources are deployed.
+                  serviceAccounts:
+                    type: object
+                    description: ServiceAccount name to Azure client ID. Set serviceAccountName on each component's pod to its key.
+                    additionalProperties:
+                      type: string
+                  configMapName:
+                    type: string
+                    description: Add to each container with envFrom.configMapRef. Holds model and OpenTelemetry settings.
+                  resourceGroupId:
+                    type: string
+                    description: The ID of the Azure resource group associated with this environment.
+                  appInsightsResourceId:
+                    type: string
               provisioned:
                 type: boolean
                 description: True only when Azure resources are applied, every output is present, and the workload ServiceAccount exists.
@@ -77,29 +97,3 @@ spec:
                 description: What provisioning is still waiting on. Empty when provisioned.
                 items:
                   type: string
-              resourceGroupId:
-                type: string
-                description: The ID of the Azure resource group associated with this environment.
-              logsEndpoint:
-                type: string
-                description: The endpoint for accessing logs related to this environment.
-              metricsEndpoint:
-                type: string
-                description: The endpoint for accessing metrics related to this environment.
-              tracesEndpoint:
-                type: string
-                description: The endpoint for accessing traces related to this environment.
-              modelEndpoint:
-                type: string
-                description: The endpoint for accessing the model related to this environment.
-              serviceAccounts:
-                type: object
-                description: ServiceAccount name to Azure client ID. Set serviceAccountName on each component's pod to its key.
-                additionalProperties:
-                  type: string
-              namespace:
-                type: string
-                description: The namespace in which the workload resources are deployed.
-              clientId:
-                type: string
-                description: The client ID used for authentication with Azure resources.
