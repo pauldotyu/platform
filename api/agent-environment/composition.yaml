@@ -60,6 +60,9 @@ spec:
               source: Remote
               module: github.com/pauldotyu/platform//modules/agent-environment?ref={{ $moduleRevision }}
               remotePullPolicy: IfNotPresent
+              varmap:
+                agents: {{ $p.agents | toJson }}
+                extra_tags: {{ dig "tags" (dict) $env | toJson }}
               vars:
               - key: team
                 value: {{ $p.team | quote }}
@@ -73,9 +76,6 @@ spec:
                 value: {{ $p.requesterObjectId | quote }}
               - key: cost_center
                 value: {{ $p.costCenter | quote }}
-              - key: agents
-                value: {{ $p.agents | toJson | quote }}
-                type: HCL
               - key: workload_cluster_id
                 value: {{ $env.clusterId | quote }}
               - key: shared_cluster_oidc_issuer_url
@@ -90,9 +90,6 @@ spec:
                 value: {{ $env.modelResourceId | quote }}
               - key: shared_model_resource_name
                 value: {{ $env.modelResourceName | quote }}
-              - key: extra_tags
-                value: {{ dig "tags" (dict) $env | toJson | quote }}
-                type: HCL
           
           {{- $workspace := getComposedResource . "opentofu-workspace" | default (dict) }}
           {{- $outputs := dig "status" "atProvider" "outputs" (dict) $workspace }}
