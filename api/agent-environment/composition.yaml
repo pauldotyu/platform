@@ -29,6 +29,7 @@ spec:
       inline:
         template: |
           {{- $env := index .context "apiextensions.crossplane.io/environment" }}
+          {{- $moduleRevision := required "EnvironmentConfig 'workload' must set moduleRevision (a commit SHA or tag)" $env.moduleRevision | quote }}
           apiVersion: opentofu.m.upbound.io/v1beta1
           kind: Workspace
           metadata:
@@ -40,7 +41,8 @@ spec:
               name: provider-opentofu
             forProvider:
               source: Remote
-              module: github.com/pauldotyu/platform//modules/agent-environment?ref=main
+              module: github.com/pauldotyu/platform//modules/agent-environment?ref={{ $moduleRevision }}
+              remotePullPolicy: IfNotPresent
               vars:
               - key: team
                 value: {{ .observed.composite.resource.spec.parameters.team | quote }}
