@@ -161,9 +161,6 @@ data "azurerm_client_config" "current" {}
 
 locals {
   namespace = "${var.team}-${var.project}-${var.environment}"
-  # "foundry" keeps its original names so existing environments migrate without replacing the principal.
-  identity_name = { for a in var.agents : a => a == "foundry" ? "mi-${local.namespace}" : "mi-${local.namespace}-${a}" }
-  fic_name      = { for a in var.agents : a => a == "foundry" ? local.namespace : "${local.namespace}-${a}" }
   tags = merge(var.extra_tags, {
     team        = var.team
     project     = var.project
@@ -174,6 +171,8 @@ locals {
     platform    = "agent-environment"
   })
   components = concat(var.agents, var.telemetry_only)
+  identity_name = { for a in local.components : a => a == "foundry" ? "mi-${local.namespace}" : "mi-${local.namespace}-${a}" }
+  fic_name      = { for a in local.components : a => a == "foundry" ? local.namespace : "${local.namespace}-${a}" }
 }
 
 resource "azurerm_resource_group" "this" {
