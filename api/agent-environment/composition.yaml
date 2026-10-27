@@ -41,6 +41,9 @@ spec:
           {{- end }}
           {{- $moduleRevision := $env.moduleRevision }}
           {{- $p := .observed.composite.resource.spec.parameters }}
+          {{- $telemetryOnly := dig "telemetryOnly" (list) $p }}
+          {{- range $telemetryOnly }}{{ if has . $p.agents }}{{ fail (printf "%s is in both agents and telemetryOnly." .) }}{{ end }}{{ end }}
+          {{- $components := concat $p.agents $telemetryOnly }}
           {{- if eq $p.requesterObjectId "00000000-0000-0000-0000-000000000000" }}
             {{- fail "requesterObjectId is the placeholder value. Use the requester's real Entra object ID." }}
           {{- end }}
@@ -62,6 +65,7 @@ spec:
               remotePullPolicy: IfNotPresent
               varmap:
                 agents: {{ $p.agents | toJson }}
+                telemetry_only: {{ $telemetryOnly | toJson }}
                 extra_tags: {{ dig "tags" (dict) $env | toJson }}
               vars:
               - key: team
@@ -90,7 +94,6 @@ spec:
                 value: {{ $env.modelResourceId | quote }}
               - key: shared_model_resource_name
                 value: {{ $env.modelResourceName | quote }}
-          
           {{- $workspace := getComposedResource . "opentofu-workspace" | default (dict) }}
           {{- $outputs := dig "status" "atProvider" "outputs" (dict) $workspace }}
           {{- $workspaceReady := false }}
@@ -107,12 +110,12 @@ spec:
             {{- if eq (dig . "" $outputs) "" }}{{ $waiting = append $waiting (printf "output: %s" .) }}{{ end }}
           {{- end }}
           {{- $clientIds := dig "agent_client_ids" (dict) $outputs }}
-          {{- range $p.agents }}
+          {{- range $components }}
             {{- if eq (dig . "" $clientIds) "" }}{{ $waiting = append $waiting (printf "identity: %s" .) }}{{ end }}
            {{- end }}
           {{- $azureReady := eq (len $waiting) 0 }}
           {{- $namespace := dig "namespace_name" "" $outputs }}
-          {{- range $agent := $p.agents }}
+          {{- range $agent := $components }}
             {{- $name := printf "sa-%s" $agent }}
             {{- $existing := getComposedResource $ $name }}
             {{- $ready := false }}
@@ -182,6 +185,106 @@ spec:
                   OTEL_SERVICE_NAMESPACE: {{ $namespace | quote }}
                   OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true" # todo: make this configurable for prod
           {{- end }}
+          {{- $platformReady := eq (len $waiting) 0}}
+          {{- $delivery := dig "delivery" (dict) $p }}
+          {{- $app := dict }}
+          {{- if $delivery }}
+            {{- $saValues := dict }}
+            {{- range $components }}{{ $_ := set $saValues . (dict "name" . "create" false) }}{{ end }}
+            {{- $appObj := getComposedResource . "argo-application" | default (dict) }}
+            {{- $app = dig "status" "atProvider" "manifest" (dict) $appObj }}
+            {{- $sync := dig "status" "sync" "status" "" $app }}
+            {{- $health := dig "status" "health" "status" "" $app }}
+            {{- if ne $sync "Synced" }}{{ $waiting = append $waiting (printf "delivery: sync %s" ($sync | default "pending")) }}{{ end }}
+            {{- if ne $health "Healthy" }}{{ $waiting = append $waiting (printf "delivery: health %s" ($health | default "pending")) }}{{ end }}
+            {{- if or $platformReady (getComposedResource . "argo-application") }}
+          ---
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: argo-project
+          spec:
+            providerConfigRef: {kind: ClusterProviderConfig, name: control-kubernetes}
+            forProvider:
+              manifest:
+                apiVersion: argoproj.io/v1alpha1
+                kind: AppProject
+                metadata:
+                  name: {{ $namespace }}
+                  namespace: argocd
+                spec:
+                  sourceRepos: [{{ $delivery.repoUrl | quote }}]
+                  destinations:
+                    - name: worker
+                      namespace: {{ $namespace | quote }}
+                  clusterResourceWhitelist: []
+                  namespaceResourceBlacklist:
+                    - group: ""
+                      kind: ServiceAccount
+                    - group: ""
+                      kind: ResourceQuota
+                    - group: ""
+                      kind: LimitRange
+                    - group: networking.k8s.io
+                      kind: NetworkPolicy
+                    - group: rbac.authorization.k8s.io
+                      kind: Role
+                    - group: rbac.authorization.k8s.io
+                      kind: RoleBinding
+          ---
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
+          kind: Object
+          metadata:
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: argo-application
+          spec:
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: control-kubernetes
+            readiness:
+              policy: DeriveFromCelQuery
+              celQuery: "has(object.status) && has(object.status.sync) && has(object.status.health) && object.status.sync.status == 'Synced' && object.status.health.status == 'Healthy'"
+            forProvider:
+              manifest:
+                apiVersion: argoproj.io/v1alpha1
+                kind: Application
+                metadata:
+                  name: {{ $namespace }}
+                  namespace: argocd
+                spec:
+                  project: {{ $namespace }}
+                  source:
+                    repoURL: {{ $delivery.repoUrl | quote }}
+                    path: {{ $delivery.path | quote }}
+                    targetRevision: {{ dig "targetRevision" "main" $delivery | quote }}
+                    helm:
+                      valuesObject:
+                        extraEnvFrom:
+                          - configMapRef:
+                              name: platform-context
+                        secret:
+                          create: false
+                        workloadIdentity:
+                          enabled: true
+                          serviceAccount:
+                            create: false
+                          serviceAccounts: {{ $saValues | toJson }}
+                  destination:
+                    name: worker
+                    namespace: {{ $namespace | quote }}
+                  syncPolicy:
+                    automated:
+                      prune: true
+                      selfHeal: true
+                    retry:
+                      limit: 5
+                      backoff:
+                        duration: 10s
+                        factor: 2
+                        maxDuration: 3m
+            {{- end }}
+          {{- end }}
           ---
           apiVersion: platform.example.org/v1alpha1
           kind: XAgentEnvironment
@@ -195,6 +298,11 @@ spec:
               configMapName: platform-context
               resourceGroupId: {{ dig "resource_group_id" "" $outputs | quote }}
               appInsightsResourceId: {{ dig "app_insights_resource_id" "" $outputs | quote }}
+              {{- if $delivery }}
+              argoApplication: {{ $namespace | quote }}
+              syncStatus: {{ dig "status" "sync" "status" "" $app | quote }}
+              healthStatus: {{ dig "status" "health" "status" "" $app | quote }}
+              {{- end }}
             {{- end }}
   - step: automatically-detect-ready
     functionRef:
