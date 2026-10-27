@@ -124,6 +124,17 @@ variable "shared_model_resource_name" {
   description = "Name of the shared model resource."
 }
 
+# Agents configuration
+variable "agents" {
+  type        = list(string)
+  description = "Model-calling components. Each gets its own ServiceAccount, managed identity, federated credential, and model role."
+  validation {
+    condition     = length(var.agents) > 0 && length(var.agents) == length(distinct(var.agents)) && alltrue([for a in var.agents : can(regex("^[a-z]([a-z0-9-]{0,18}[a-z0-9])?$", a))])
+    error_message = "agents must be a nonempty list of distinct lowercase DNS labels of at most 20 characters."
+  }
+  default = ["foundry"]
+}
+
 provider "azurerm" {
   features {
     resource_group {
@@ -136,8 +147,10 @@ provider "azurerm" {
 data "azurerm_client_config" "current" {}
 
 locals {
-  namespace                    = "${var.team}-${var.project}-${var.environment}"
-  foundry_service_account_name = "foundry"
+  namespace = "${var.team}-${var.project}-${var.environment}"
+  # "foundry" keeps its original names so existing environments migrate without replacing the principal.
+  identity_name = { for a in var.agents : a => a == "foundry" ? "mi-${local.namespace}" : "mi-${local.namespace}-${a}" }
+  fic_name      = { for a in var.agents : a => a == "foundry" ? local.namespace : "${local.namespace}-${a}" }
 }
 
 resource "azurerm_resource_group" "this" {
@@ -249,10 +262,20 @@ resource "azurerm_role_assignment" "requester_cluster_user" {
   scope                = var.workload_cluster_id
 }
 
-resource "azurerm_user_assigned_identity" "foundry" {
+resource "azurerm_user_assigned_identity" "agent" {
+  for_each            = toset(var.agents)
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
-  name                = "mi-${var.team}-${var.project}-${var.environment}"
+  name                = local.identity_name[each.key]
+  tags                = { team = var.team, project = var.project, environment = var.environment, cost_center = var.cost_center, agent = each.key }
+}
+
+resource "azurerm_role_assignment" "agent_model_user" {
+  for_each             = azurerm_user_assigned_identity.agent
+  principal_id         = each.value.principal_id
+  principal_type       = "ServicePrincipal"
+  role_definition_name = "Cognitive Services OpenAI User"
+  scope                = var.shared_model_resource_id
 }
 
 resource "azurerm_role_assignment" "requester_foundry_user" {
@@ -261,18 +284,13 @@ resource "azurerm_role_assignment" "requester_foundry_user" {
   scope                = var.shared_model_resource_id
 }
 
-resource "azurerm_role_assignment" "foundry_user" {
-  principal_id         = azurerm_user_assigned_identity.foundry.principal_id
-  role_definition_name = "Cognitive Services OpenAI User"
-  scope                = var.shared_model_resource_id
-}
-
-resource "azurerm_federated_identity_credential" "foundry" {
-  user_assigned_identity_id = azurerm_user_assigned_identity.foundry.id
+resource "azurerm_federated_identity_credential" "agent" {
+  for_each                  = azurerm_user_assigned_identity.agent
+  user_assigned_identity_id = each.value.id
   name                      = "${var.team}-${var.project}-${var.environment}"
   issuer                    = var.shared_cluster_oidc_issuer_url
   audience                  = ["api://AzureADTokenExchange"]
-  subject                   = "system:serviceaccount:${var.team}-${var.project}-${var.environment}:${local.foundry_service_account_name}"
+  subject                   = "system:serviceaccount:${local.namespace}:${each.key}"
 }
 
 output "resource_group_id" {
@@ -303,10 +321,7 @@ output "foundry_openai_base_url" {
   value       = "https://${var.shared_model_resource_name}.services.ai.azure.com/openai/v1/"
 }
 
-output "foundry_service_account_name" {
-  value = local.foundry_service_account_name
-}
-
-output "workload_identity_client_id" {
-  value = azurerm_user_assigned_identity.foundry.client_id
+output "agent_client_ids" {
+  description = "ServiceAccount name to managed identity client ID."
+  value       = { for a, id in azurerm_user_assigned_identity.agent : a => id.client_id }
 }

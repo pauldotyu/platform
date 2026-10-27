@@ -73,6 +73,9 @@ spec:
                 value: {{ $p.requesterObjectId | quote }}
               - key: cost_center
                 value: {{ $p.costCenter | quote }}
+              - key: agents
+                value: {{ $p.agents | toJson | quote }}
+                type: HCL
               - key: workload_cluster_id
                 value: {{ $env.clusterId | quote }}
               - key: shared_cluster_oidc_issuer_url
@@ -96,32 +99,34 @@ spec:
             {{- if and (eq .type "Ready") (eq .status "True") }}{{ $workspaceReady = true }}{{ end }}
             {{- if and (eq .type "Synced") (eq .status "True") }}{{ $workspaceSynced = true }}{{ end }}
           {{- end }}
-          {{- $required := list "resource_group_id" "namespace_name" "workload_identity_client_id" "foundry_service_account_name" "foundry_openai_base_url" "otel_logs_endpoint" "otel_metrics_endpoint" "otel_traces_endpoint" }}
+          {{- $required := list "resource_group_id" "namespace_name" "foundry_openai_base_url" "otel_logs_endpoint" "otel_metrics_endpoint" "otel_traces_endpoint" }}
           {{- $waiting := list }}
           {{- if not $workspaceSynced }}{{ $waiting = append $waiting "workspace: not synced" }}{{ end }}
           {{- if not $workspaceReady }}{{ $waiting = append $waiting "workspace: not ready" }}{{ end }}
           {{- range $required }}
             {{- if eq (dig . "" $outputs) "" }}{{ $waiting = append $waiting (printf "output: %s" .) }}{{ end }}
           {{- end }}
+          {{- $clientIds := dig "agent_client_ids" (dict) $outputs }}
+          {{- range $p.agents }}
+            {{- if eq (dig . "" $clientIds) "" }}{{ $waiting = append $waiting (printf "identity: %s" .) }}{{ end }}
+           {{- end }}
           {{- $azureReady := eq (len $waiting) 0 }}
           {{- $namespace := dig "namespace_name" "" $outputs }}
-          {{- $clientId := dig "workload_identity_client_id" "" $outputs }}
-          {{- $serviceAccountName := dig "foundry_service_account_name" "" $outputs }}
-          {{- $existingSA := getComposedResource . "workload-service-account" }}
-          {{- $saReady := false }}
-          {{- range (dig "status" "conditions" (list) ($existingSA | default (dict))) }}
-            {{- if and (eq .type "Ready") (eq .status "True") }}{{ $saReady = true }}{{ end }}
-          {{- end }}
-          {{- if not $saReady }}{{ $waiting = append $waiting "serviceaccount: not ready" }}{{ end }}
-
-          {{- /* Keep the SA once created so a transient Workspace blip never deletes it. */}}
-          {{- if or $azureReady $existingSA }}
+          {{- range $agent := $p.agents }}
+            {{- $name := printf "sa-%s" $agent }}
+            {{- $existing := getComposedResource $ $name }}
+            {{- $ready := false }}
+            {{- range (dig "status" "conditions" (list) ($existing | default (dict))) }}
+              {{- if and (eq .type "Ready") (eq .status "True") }}{{ $ready = true }}{{ end }}
+            {{- end }}
+            {{- if not $ready }}{{ $waiting = append $waiting (printf "serviceaccount: %s" $agent) }}{{ end }}
+            {{- if or $azureReady $existing }}
           ---
           apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
             annotations:
-              gotemplating.fn.crossplane.io/composition-resource-name: workload-service-account
+              gotemplating.fn.crossplane.io/composition-resource-name: {{ $name }}
           spec:
             providerConfigRef:
               kind: ClusterProviderConfig
@@ -131,10 +136,11 @@ spec:
                 apiVersion: v1
                 kind: ServiceAccount
                 metadata:
-                  name: {{ $serviceAccountName | quote }}
+                  name: {{ $agent | quote }}
                   namespace: {{ $namespace | quote }}
                   annotations:
-                    azure.workload.identity/client-id: {{ $clientId | quote }}
+                    azure.workload.identity/client-id: {{ dig $agent "" $clientIds | quote }}
+            {{- end }}
           {{- end }}
           ---
           apiVersion: platform.example.org/v1alpha1
@@ -145,8 +151,7 @@ spec:
             {{- if $azureReady }}
             resourceGroupId: {{ dig "resource_group_id" "" $outputs | quote }}
             namespace: {{ $namespace | quote }}
-            clientId: {{ $clientId | quote }}
-            serviceAccountName: {{ $serviceAccountName | quote }}
+            serviceAccounts: {{ $clientIds | toJson }}
             modelEndpoint: {{ dig "foundry_openai_base_url" "" $outputs | quote }}
             logsEndpoint: {{ dig "otel_logs_endpoint" "" $outputs | quote }}
             metricsEndpoint: {{ dig "otel_metrics_endpoint" "" $outputs | quote }}
