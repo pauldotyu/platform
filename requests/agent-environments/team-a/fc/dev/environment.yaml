@@ -1,0 +1,19 @@
+apiVersion: platform.example.org/v1alpha1
+kind: XAgentEnvironment
+metadata:
+  name: team-a-fc-dev
+  namespace: agent-environments
+spec:
+  parameters:
+    team: "team-a"
+    project: "fc"
+    environment: "dev"
+    location: "westus3"
+    costCenter: "cc-143"
+    requesterObjectId: "7002a869-11f9-4ac2-8cad-c16a09128b02"
+    agents: ["concierge","ops-agent"]
+    telemetryOnly: ["fourth-coffee-mcp"]
+    delivery:
+      repoUrl: "https://github.com/pauldotyu/fourth-coffee"
+      path: "deploy/helm/fourth-coffee"
+      targetRevision: "main"
