@@ -26,10 +26,27 @@ spec:
       apiVersion: gotemplating.fn.crossplane.io/v1beta1
       kind: GoTemplate
       source: Inline
+      options: [ "missingkey=error" ]
       inline:
         template: |
-          {{- $env := index .context "apiextensions.crossplane.io/environment" }}
-          {{- $moduleRevision := required "EnvironmentConfig 'workload' must set moduleRevision (a commit SHA or tag)" $env.moduleRevision | quote }}
+          {{- $env := index .context "apiextensions.crossplane.io/environment" | default (dict) }}
+          {{- range list "moduleRevision" "clusterId" "clusterOidcIssuerUrl" "location" "monitorWorkspaceId" "logAnalyticsWorkspaceId" "modelResourceId" "modelResourceName" }}
+            {{- if eq (dig . "" $env) "" }}{{ fail (printf "EnvironmentConfig 'workload' is missing %q. Platform team: set it and re-sync." .) }}{{ end }}
+          {{- end }}
+          {{- if not (regexMatch "^[0-9a-f]{40}$|^v[0-9]+\\.[0-9]+\\.[0-9]+$" $env.moduleRevision) }}
+            {{- fail (printf "moduleRevision %q must be a full commit SHA or a vX.Y.Z tag, not a branch." $env.moduleRevision) }}
+          {{- end }}
+          {{- if not (hasPrefix "https://" $env.clusterOidcIssuerUrl) }}
+            {{- fail "clusterOidcIssuerUrl must be an https:// issuer URL." }}
+          {{- end }}
+          {{- $moduleRevision := $env.moduleRevision }}
+          {{- $p := .observed.composite.resource.spec.parameters }}
+          {{- if eq $p.requesterObjectId "00000000-0000-0000-0000-000000000000" }}
+            {{- fail "requesterObjectId is the placeholder value. Use the requester's real Entra object ID." }}
+          {{- end }}
+          {{- if gt (len (printf "%s-%s-%s" $p.team $p.project $p.environment)) 63 }}
+            {{- fail "team-project-environment must be 63 characters or fewer to form a valid namespace name." }}
+          {{- end }}
           apiVersion: opentofu.m.upbound.io/v1beta1
           kind: Workspace
           metadata:
@@ -45,17 +62,17 @@ spec:
               remotePullPolicy: IfNotPresent
               vars:
               - key: team
-                value: {{ .observed.composite.resource.spec.parameters.team | quote }}
+                value: {{ $p.team | quote }}
               - key: project
-                value: {{ .observed.composite.resource.spec.parameters.project | quote }}
+                value: {{ $p.project | quote }}
               - key: environment
-                value: {{ .observed.composite.resource.spec.parameters.environment | quote }}
+                value: {{ $p.environment | quote }}
               - key: location
-                value: {{ .observed.composite.resource.spec.parameters.location | quote }}
+                value: {{ $p.location | quote }}
               - key: requester_object_id
-                value: {{ .observed.composite.resource.spec.parameters.requesterObjectId | quote }}
+                value: {{ $p.requesterObjectId | quote }}
               - key: cost_center
-                value: {{ .observed.composite.resource.spec.parameters.costCenter | quote }}
+                value: {{ $p.costCenter | quote }}
               - key: workload_cluster_id
                 value: {{ $env.clusterId | quote }}
               - key: shared_cluster_oidc_issuer_url
