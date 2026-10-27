@@ -70,7 +70,7 @@ spec:
             type: object
             properties:
               binding:
-                type: string
+                type: object
                 description: Everything an application needs to run in this environment. Present only when provisioned is true.
                 properties:
                   namespace:
