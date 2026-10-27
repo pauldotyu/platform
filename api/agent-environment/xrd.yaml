@@ -58,7 +58,7 @@ spec:
                     pattern: '^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$'
                   agents:
                     type: array
-                    description: Model-calling components. Each gets its own ServiceAccount and Azure identity.
+                    description: Model-calling components. Each gets its own ServiceAccount and Azure identity with model and telemetry access.
                     default: [foundry]
                     minItems: 1
                     maxItems: 5
@@ -66,6 +66,30 @@ spec:
                     items:
                       type: string
                       pattern: '^[a-z]([a-z0-9-]{0,18}[a-z0-9])?$'
+                  telemetryOnly:
+                    type: array
+                    description: Components that send telemetry but never call the model. Each gets its own ServiceAccount and an identity with telemetry access only.
+                    default: []
+                    maxItems: 5
+                    x-kubernetes-list-type: set
+                    items:
+                      type: string
+                      pattern: '^[a-z]([a-z0-9-]{0,18}[a-z0-9])?$'
+                  delivery:
+                    type: object
+                    description: Optional. Helm chart in Git that the platform deploys into this environment.
+                    required: [repoUrl, path]
+                    properties:
+                      repoUrl:
+                        type: string
+                        pattern: '^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(\.git)?$'
+                      path:
+                        type: string
+                        description: Chart directory in the repo, for example deploy/helm/fourth-coffee.
+                        pattern: '^[A-Za-z0-9_/.-]+$'
+                      targetRevision:
+                        type: string
+                        default: main
           status:
             type: object
             properties:
@@ -89,6 +113,16 @@ spec:
                     description: The ID of the Azure resource group associated with this environment.
                   appInsightsResourceId:
                     type: string
+                    description: The ID of the Azure Application Insights resource associated with this environment.
+                  argoApplication:
+                    type: string
+                    description: The name of the Argo CD application associated with this environment.
+                  syncStatus:
+                    type: string
+                    description: The sync status of the Argo CD application.
+                  healthStatus:
+                    type: string
+                    description: The health status of the Argo CD application.
               provisioned:
                 type: boolean
                 description: True only when Azure resources are applied, every output is present, and the workload ServiceAccount exists.

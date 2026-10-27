@@ -13,7 +13,6 @@ terraform {
   }
 }
 
-# Request variables
 variable "team" {
   type        = string
   description = "Requesting team. First segment of the namespace and resource group name."
@@ -68,7 +67,6 @@ variable "requester_object_id" {
   }
 }
 
-# Platform variables
 variable "workload_cluster_id" {
   type        = string
   description = "ID of the workload cluster."
@@ -130,7 +128,6 @@ variable "extra_tags" {
   default     = {}
 }
 
-# Agents configuration
 variable "agents" {
   type        = list(string)
   description = "Model-calling components. Each gets its own ServiceAccount, managed identity, federated credential, and model role."
@@ -139,6 +136,16 @@ variable "agents" {
     error_message = "agents must be a nonempty list of distinct lowercase DNS labels of at most 20 characters."
   }
   default = ["foundry"]
+}
+
+variable "telemetry_only" {
+  type        = list(string)
+  default     = []
+  description = "Components that export telemetry but never call the model."
+  validation {
+    condition     = length(setintersection(toset(var.telemetry_only), toset(var.agents))) == 0
+    error_message = "A component cannot be in both agents and telemetry_only."
+  }
 }
 
 provider "azurerm" {
@@ -166,6 +173,7 @@ locals {
     managed-by  = "crossplane-opentofu"
     platform    = "agent-environment"
   })
+  components = concat(var.agents, var.telemetry_only)
 }
 
 resource "azurerm_resource_group" "this" {
@@ -195,6 +203,7 @@ resource "azapi_resource" "otel" {
       AzureMonitorWorkspaceIngestionMode = "Enabled"
       publicNetworkAccessForIngestion    = "Enabled"
       publicNetworkAccessForQuery        = "Enabled"
+      DisableLocalAuth                   = true
     }
   }
 
@@ -277,7 +286,7 @@ resource "azurerm_role_assignment" "requester_cluster_user" {
 }
 
 resource "azurerm_user_assigned_identity" "agent" {
-  for_each            = toset(var.agents)
+  for_each            = toset(local.components)
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
   name                = local.identity_name[each.key]
@@ -285,11 +294,20 @@ resource "azurerm_user_assigned_identity" "agent" {
 }
 
 resource "azurerm_role_assignment" "agent_model_user" {
-  for_each             = azurerm_user_assigned_identity.agent
-  principal_id         = each.value.principal_id
+  for_each             = toset(var.agents)
+  principal_id         = azurerm_user_assigned_identity.agent[each.key].principal_id
   principal_type       = "ServicePrincipal"
   role_definition_name = "Cognitive Services OpenAI User"
   scope                = var.shared_model_resource_id
+}
+
+resource "azurerm_role_assignment" "agent_telemetry" {
+  for_each                         = azurerm_user_assigned_identity.agent
+  scope                            = azapi_resource.otel.output.properties.DataCollectionRuleResourceId
+  role_definition_name             = "Monitoring Metrics Publisher"
+  principal_id                     = each.value.principal_id
+  principal_type                   = "ServicePrincipal"
+  skip_service_principal_aad_check = true
 }
 
 resource "azurerm_role_assignment" "requester_foundry_user" {
@@ -338,6 +356,7 @@ output "foundry_openai_base_url" {
 output "agent_client_ids" {
   description = "ServiceAccount name to managed identity client ID."
   value       = { for a, id in azurerm_user_assigned_identity.agent : a => id.client_id }
+  depends_on  = [azurerm_federated_identity_credential.agent, azurerm_role_assignment.agent_model_user, azurerm_role_assignment.agent_telemetry]
 }
 
 output "app_insights_resource_id" {
