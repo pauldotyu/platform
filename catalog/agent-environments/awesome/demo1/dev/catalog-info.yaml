@@ -1,0 +1,24 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: awesome-demo1-dev
+  description: Agent environment requested through Backstage
+  labels:
+    team: "awesome"
+    project: "demo1"
+    environment: "dev"
+    region: "westus3"
+  annotations:
+    platform.example.org/requested-by: "user:default/paul_yucancloud.com"
+    backstage.io/source-template: template:default/create-agent-environment
+    backstage.io/kubernetes-namespace: agent-environments
+    backstage.io/kubernetes-label-selector: crossplane.io/composite=awesome-demo1-dev
+  links:
+    - url: https://github.com/pauldotyu/platform/blob/main/requests/agent-environments/awesome/demo1/dev/environment.yaml
+      title: Environment request
+    - url: >-
+        https://backstage.aks.rocks/create/templates/default/delete-agent-environment?formData=%7B%22environmentRef%22%3A%22resource%3Adefault%2Fawesome-demo1-dev%22%7D
+      title: Request deletion
+spec:
+  type: agent-environment
+  owner: "group:default/backstage-users"
