@@ -90,6 +90,9 @@ spec:
                 value: {{ $env.modelResourceId | quote }}
               - key: shared_model_resource_name
                 value: {{ $env.modelResourceName | quote }}
+              - key: extra_tags
+                value: {{ dig "tags" (dict) $env | toJson | quote }}
+                type: HCL
           
           {{- $workspace := getComposedResource . "opentofu-workspace" | default (dict) }}
           {{- $outputs := dig "status" "atProvider" "outputs" (dict) $workspace }}

@@ -124,6 +124,12 @@ variable "shared_model_resource_name" {
   description = "Name of the shared model resource."
 }
 
+variable "extra_tags" {
+  type        = map(string)
+  description = "Platform-level tags, for example expiry or business unit. Request tags win on conflict."
+  default     = {}
+}
+
 # Agents configuration
 variable "agents" {
   type        = list(string)
@@ -151,17 +157,21 @@ locals {
   # "foundry" keeps its original names so existing environments migrate without replacing the principal.
   identity_name = { for a in var.agents : a => a == "foundry" ? "mi-${local.namespace}" : "mi-${local.namespace}-${a}" }
   fic_name      = { for a in var.agents : a => a == "foundry" ? local.namespace : "${local.namespace}-${a}" }
+  tags = merge(var.extra_tags, {
+    team        = var.team
+    project     = var.project
+    environment = var.environment
+    costCenter  = var.cost_center
+    requestor   = var.requester_object_id
+    managed-by  = "crossplane-opentofu"
+    platform    = "agent-environment"
+  })
 }
 
 resource "azurerm_resource_group" "this" {
   name     = "rg-${local.namespace}"
   location = var.location
-  tags = {
-    team        = var.team
-    project     = var.project
-    environment = var.environment
-    costCenter  = var.cost_center
-  }
+  tags     = local.tags
 }
 
 resource "azapi_resource" "otel" {
@@ -191,6 +201,8 @@ resource "azapi_resource" "otel" {
   response_export_values = [
     "*"
   ]
+
+  tags = local.tags
 }
 
 // https://learn.microsoft.com/azure/templates/microsoft.containerservice/managedclusters/managednamespaces?pivots=deployment-language-terraform
@@ -230,6 +242,8 @@ resource "azapi_resource" "namespace" {
     }
   }
 
+  tags = local.tags
+
   lifecycle {
     precondition {
       condition     = !startswith(local.namespace, "kube-") && !contains(["default", "argocd", "crossplane-system", "agent-environments", "app-routing-system", "aks-istio-system", "gatekeeper-system", "cert-manager", "backstage"], local.namespace)
@@ -267,7 +281,7 @@ resource "azurerm_user_assigned_identity" "agent" {
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
   name                = local.identity_name[each.key]
-  tags                = { team = var.team, project = var.project, environment = var.environment, cost_center = var.cost_center, agent = each.key }
+  tags                = merge(local.tags, { agent = each.key })
 }
 
 resource "azurerm_role_assignment" "agent_model_user" {
