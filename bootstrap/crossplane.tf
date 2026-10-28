@@ -37,6 +37,12 @@ resource "azurerm_role_assignment" "opentofu_storage_blob_data_contributor" {
   skip_service_principal_aad_check = true
 }
 
+resource "azurerm_role_assignment" "admin_storage_blob_data_contributor" {
+  principal_id         = data.azurerm_client_config.current.object_id
+  scope                = azurerm_storage_account.opentofu.id
+  role_definition_name = "Storage Blob Data Contributor"
+}
+
 resource "azurerm_role_assignment" "opentofu_contributor" {
   principal_id                     = azurerm_user_assigned_identity.opentofu.principal_id
   scope                            = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
