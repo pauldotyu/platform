@@ -138,6 +138,8 @@ az aks get-credentials \
   --name "$AKS_WORKER_NAME"
 
 kubectl config current-context
+
+kubectl config use-context "$AKS_CONTROL_NAME"
 ```
 
 Verify the context before applying any manifests below. These commands target the control cluster, not the workload cluster. To connect to the workload cluster, use `$AKS_WORKER_NAME` instead of `$AKS_CONTROL_NAME`.
@@ -287,6 +289,7 @@ kubectl --context "$AKS_CONTROL_NAME" wait --for=condition=Ready \
   externalsecret.external-secrets.io/backstage-secrets \
   -n backstage \
   --timeout=300s
+
 kubectl --context "$AKS_CONTROL_NAME" get externalsecret.external-secrets.io/backstage-secrets -n backstage
 ```
 
@@ -297,9 +300,9 @@ The existing bootstrap runbook pins the following Backstage chart version. Keep 
 ```bash
 helm upgrade --install backstage \
   oci://ghcr.io/pauldotyu/charts/backstage \
-  --version 0.1.0-sha-90916e5 \
+  --version 0.1.0-sha-41f2b78 \
   --namespace backstage \
-  --values kubernetes/control/backstage-values.yaml \
+  --values kubernetes/control/backstage/values.yaml \
   --wait \
   --timeout 10m
 ```
