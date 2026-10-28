@@ -290,6 +290,11 @@ spec:
                         maxDuration: 3m
             {{- end }}
             {{- $expose := dig "expose" (dict) $delivery }}
+            {{- $routeReady := false }}
+            {{- range (dig "status" "conditions" (list) (getComposedResource . "app-route" | default (dict))) }}
+              {{- if and (eq .type "Ready") (eq .status "True") }}{{ $routeReady = true }}{{ end }}
+            {{- end }}
+            {{- if and $expose (not $routeReady) }}{{ $waiting = append $waiting "route: not ready" }}{{ end }}
             {{- if and $expose (or (getComposedResource . "argo-application") (getComposedResource . "app-route")) }}
           ---
           apiVersion: kubernetes.m.crossplane.io/v1alpha1
