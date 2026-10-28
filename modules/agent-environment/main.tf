@@ -164,6 +164,7 @@ locals {
     medium = { cpuRequest = "2000m", cpuLimit = "8000m", memoryRequest = "4096Mi", memoryLimit = "16384Mi" }
     large  = { cpuRequest = "4000m", cpuLimit = "16000m", memoryRequest = "8192Mi", memoryLimit = "32768Mi" }
   }
+  worker_resource_group_name = regex("^/subscriptions/[0-9a-f-]{36}/resourceGroups/([^/]+)", var.workload_cluster_id)[0]
 }
 
 provider "azurerm" {
@@ -258,7 +259,7 @@ resource "azapi_resource" "namespace" {
         "headlamp.dev/project-id"            = var.team
         "headlamp.dev/project-managed-by"    = "aks-desktop"
         "aks-desktop/project-subscription"   = data.azurerm_client_config.current.subscription_id
-        "aks-desktop/project-resource-group" = azurerm_resource_group.this.name
+        "aks-desktop/project-resource-group" = local.worker_resource_group_name # if the workload cluster is in a different resource group, azure places the namespace in the same resource group as the cluster, so aks-desktop needs to know the correct resource group of the cluster, not the managed namespace resource.
         "platform.example.org/gateway-access" = "enabled"
       }
     }
