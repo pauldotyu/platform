@@ -326,6 +326,22 @@ If sign-in fails, inspect the Backstage logs and confirm that the Microsoft Grap
 
 Demo [Backstage repo](https://github.com/pauldotyu/backstage) is configured to [automatically load](https://github.com/pauldotyu/backstage/blob/3415a275a61708992bd267ca2f2e3170403e6408/app-config.yaml#L201) the templates into the catalog.
 
+## Configure network routing on worker
+
+The gateway on the worker cluster needs to be configured to route traffic appropriately to applications deployed via Backstage.
+
+```bash
+kubectl --context "$AKS_WORKER_NAME" apply -f kubernetes/worker/cert-manager.yaml
+kubectl --context "$AKS_WORKER_NAME" apply -f kubernetes/worker/external-dns.yaml
+kubectl --context "$AKS_WORKER_NAME" apply -f kubernetes/worker/gateway.yaml
+```
+
+Verify the gateway configuration on the worker cluster:
+
+```bash
+kubectl --context "$AKS_WORKER_NAME" -n platform-gateway get certificate,gateway
+```
+
 ## Verify the developer flow
 
 Use a disposable environment for the first end-to-end check:
