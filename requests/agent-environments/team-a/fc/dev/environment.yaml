@@ -8,6 +8,7 @@ spec:
     team: "team-a"
     project: "fc"
     environment: "dev"
+    size: "small"
     location: "westus3"
     costCenter: "cc-143"
     requesterObjectId: "7002a869-11f9-4ac2-8cad-c16a09128b02"
