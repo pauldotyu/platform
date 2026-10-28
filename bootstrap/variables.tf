@@ -123,5 +123,5 @@ variable "model_deployment" {
 variable "platform_module_revision" {
   description = "Commit SHA (preferred) or tag of pauldotyu/platform. Bump it on purpose to roll out module changes."
   type        = string
-  default     = "c80b00ecc2ec442ed94df3bf9461d077edda0c0d"
+  default     = "19756ac92180d37e7c4e7b47500429f4a684be89"
 }
