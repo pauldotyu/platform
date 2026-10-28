@@ -95,6 +95,18 @@ spec:
                       targetRevision:
                         type: string
                         default: main
+                      expose:
+                        type: object
+                        description: Optional. Service the platform exposes at https://<namespace>.<apps domain>.
+                        required: [service, port]
+                        properties:
+                          service:
+                            type: string
+                            pattern: '^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$'
+                          port:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
           status:
             type: object
             properties:
@@ -128,6 +140,9 @@ spec:
                   healthStatus:
                     type: string
                     description: The health status of the Argo CD application.
+                  url:
+                    type: string
+                    description: The URL at which the platform exposes the service.
               provisioned:
                 type: boolean
                 description: True only when Azure resources are applied, every output is present, and the workload ServiceAccount exists.

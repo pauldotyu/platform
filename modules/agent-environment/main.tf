@@ -259,6 +259,7 @@ resource "azapi_resource" "namespace" {
         "headlamp.dev/project-managed-by"    = "aks-desktop"
         "aks-desktop/project-subscription"   = data.azurerm_client_config.current.subscription_id
         "aks-desktop/project-resource-group" = azurerm_resource_group.this.name
+        "platform.example.org/gateway-access" = "enabled"
       }
     }
   }

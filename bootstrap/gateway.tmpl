@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-gateway
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: apps-wildcard
+  namespace: platform-gateway
+spec:
+  secretName: apps-wildcard-tls
+  dnsNames:
+  - "*.${DOMAIN}"
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: apps
+  namespace: platform-gateway
+spec:
+  gatewayClassName: approuting-istio
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.${DOMAIN}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+        - name: apps-wildcard-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              platform.example.org/gateway-access: enabled
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "*.${DOMAIN}"
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: https-redirect
+  namespace: platform-gateway
+spec:
+  parentRefs:
+    - name: apps
+      sectionName: http
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

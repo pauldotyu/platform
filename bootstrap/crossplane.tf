@@ -103,6 +103,7 @@ resource "local_file" "opentofu_provider" {
       SHARED_MODEL_DEPLOYMENT_NAME         = var.model_deployment.model.name
       PLATFORM_MODULE_REVISION             = var.platform_module_revision
       PROVIDER_KUBERNETES_CLIENT_ID        = azurerm_user_assigned_identity.provider_kubernetes.client_id
+      APPS_DOMAIN                          = azurerm_dns_zone.apps.name
     }
   )
 }

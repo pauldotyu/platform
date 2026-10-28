@@ -46,7 +46,7 @@ resource "azurerm_federated_identity_credential" "worker_external_dns" {
 
 resource "azurerm_role_assignment" "worker_external_dns" {
   principal_id                     = azurerm_user_assigned_identity.worker_external_dns.principal_id
-  scope                            = azurerm_dns_zone.example.id
+  scope                            = azurerm_dns_zone.apps.id
   role_definition_name             = "DNS Zone Contributor"
   skip_service_principal_aad_check = true
 }

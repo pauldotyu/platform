@@ -72,7 +72,7 @@ resource "azurerm_user_assigned_identity" "worker_cert_manager" {
 
 resource "azurerm_role_assignment" "worker_cert_manager" {
   principal_id                     = azurerm_user_assigned_identity.worker_cert_manager.principal_id
-  scope                            = azurerm_dns_zone.example.id
+  scope                            = azurerm_dns_zone.apps.id
   role_definition_name             = "DNS Zone Contributor"
   skip_service_principal_aad_check = true
 }
@@ -130,7 +130,7 @@ resource "local_file" "worker_cert_manager" {
       ADMIN_EMAIL                     = var.admin_email
       RG_NAME                         = azurerm_resource_group.example.name
       SUBSCRIPTION_ID                 = data.azurerm_client_config.current.subscription_id
-      DNS_ZONE_NAME                   = azurerm_dns_zone.example.name
+      DNS_ZONE_NAME                   = azurerm_dns_zone.apps.name
       CERT_MANAGER_IDENTITY_CLIENT_ID = azurerm_user_assigned_identity.worker_cert_manager.client_id
     }
   )
