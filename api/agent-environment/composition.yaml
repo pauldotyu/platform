@@ -183,6 +183,7 @@ spec:
                   OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: {{ dig "otel_logs_endpoint" "" $outputs | quote }}
                   OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: {{ dig "otel_metrics_endpoint" "" $outputs | quote }}
                   OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: DELTA
+                  OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION: base2_exponential_bucket_histogram
                   OTEL_RESOURCE_ATTRIBUTES: {{ printf "microsoft.applicationId=%s" (dig "app_insights_application_id" "" $outputs) | quote }}
                   OTEL_SERVICE_NAMESPACE: {{ $namespace | quote }}
                   OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true" # todo: make this configurable for prod
