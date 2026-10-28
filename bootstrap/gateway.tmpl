@@ -61,3 +61,24 @@ spec:
           requestRedirect:
             scheme: https
             statusCode: 301
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-httproute-manager
+rules:
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [httproutes]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: provider-kubernetes-httproutes
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-httproute-manager
+subjects:
+  - kind: User
+    name: "${PROVIDER_KUBERNETES_OBJECT_ID}"
