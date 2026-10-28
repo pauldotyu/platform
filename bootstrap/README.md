@@ -153,8 +153,6 @@ kubectl --context "$AKS_CONTROL_NAME" apply -f kubernetes/control/cert-manager.y
 kubectl --context "$AKS_CONTROL_NAME" get clusterissuer
 ```
 
-The current templates use `letsencrypt-staging`. Its certificates are not trusted by browsers. Use staging to validate issuance; configure a production issuer and update its references before treating these endpoints as production-ready.
-
 ## Configure Crossplane
 
 Install the providers, composition functions, runtime configuration, and shared environment settings:
