@@ -74,6 +74,8 @@ spec:
                 value: {{ $p.project | quote }}
               - key: environment
                 value: {{ $p.environment | quote }}
+              - key: size
+                value: {{ dig "size" "small" $p | quote }}
               - key: location
                 value: {{ $p.location | quote }}
               - key: requester_object_id

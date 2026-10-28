@@ -148,6 +148,24 @@ variable "telemetry_only" {
   }
 }
 
+variable "size" {
+  type        = string
+  default     = "small"
+  description = "Namespace capacity tier."
+  validation {
+    condition     = contains(["small", "medium", "large"], var.size)
+    error_message = "size must be small, medium, or large."
+  }
+}
+
+locals {
+  quotas = {
+    small  = { cpuRequest = "1000m", cpuLimit = "4000m", memoryRequest = "2048Mi", memoryLimit = "8192Mi" }
+    medium = { cpuRequest = "2000m", cpuLimit = "8000m", memoryRequest = "4096Mi", memoryLimit = "16384Mi" }
+    large  = { cpuRequest = "4000m", cpuLimit = "16000m", memoryRequest = "8192Mi", memoryLimit = "32768Mi" }
+  }
+}
+
 provider "azurerm" {
   features {
     resource_group {
@@ -170,7 +188,7 @@ locals {
     managed-by  = "crossplane-opentofu"
     platform    = "agent-environment"
   })
-  components = concat(var.agents, var.telemetry_only)
+  components    = concat(var.agents, var.telemetry_only)
   identity_name = { for a in local.components : a => a == "foundry" ? "mi-${local.namespace}" : "mi-${local.namespace}-${a}" }
   fic_name      = { for a in local.components : a => a == "foundry" ? local.namespace : "${local.namespace}-${a}" }
 }
@@ -234,13 +252,8 @@ resource "azapi_resource" "namespace" {
         egress  = "AllowAll"
         ingress = "AllowAll"
       }
-      defaultResourceQuota = {
-        cpuLimit      = "2000m"
-        cpuRequest    = "2000m"
-        memoryLimit   = "4096Mi"
-        memoryRequest = "4096Mi"
-      }
-      deletePolicy = "Delete"
+      defaultResourceQuota = local.quotas[var.size]
+      deletePolicy         = "Delete"
       labels = {
         "headlamp.dev/project-id"            = var.team
         "headlamp.dev/project-managed-by"    = "aks-desktop"

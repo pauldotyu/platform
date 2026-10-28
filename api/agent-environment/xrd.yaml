@@ -46,6 +46,11 @@ spec:
                     minLength: 1
                     maxLength: 20
                     pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+                  size:
+                    type: string
+                    description: Namespace capacity tier. Maps to a ResourceQuota defined in the agent-environment module.
+                    enum: [small, medium, large]
+                    default: small
                   location:
                     type: string
                     enum: [westus3, eastus, centralus]
