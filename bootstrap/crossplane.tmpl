@@ -1,0 +1,130 @@
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: workload
+data:
+  clusterId: "${SHARED_CLUSTER_ID}"
+  clusterOidcIssuerUrl: "${SHARED_CLUSTER_OIDC_ISSUER_URL}"
+  location: "${SHARED_CLUSTER_LOCATION}"
+  monitorWorkspaceId: "${SHARED_MONITOR_WORKSPACE_ID}"
+  logAnalyticsWorkspaceId: "${SHARED_LOG_ANALYTICS_WORKSPACE_ID}"
+  modelResourceId: "${SHARED_MODEL_RESOURCE_ID}"
+  modelResourceName: "${SHARED_MODEL_RESOURCE_NAME}"
+  modelDeploymentName: "${SHARED_MODEL_DEPLOYMENT_NAME}"
+  # Commit SHA (preferred) or tag of pauldotyu/platform. Bump it on purpose to roll out module changes.
+  moduleRevision: "${PLATFORM_MODULE_REVISION}"
+  tags:
+    businessUnit: aks-dx
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: provider-kubernetes
+spec:
+  serviceAccountTemplate:
+    metadata:
+      name: provider-kubernetes
+      annotations:
+        azure.workload.identity/client-id: "${PROVIDER_KUBERNETES_CLIENT_ID}"
+        azure.workload.identity/tenant-id: "${AZURE_TENANT_ID}"
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        metadata:
+          labels:
+            azure.workload.identity/use: "true"
+        spec:
+          containers:
+            - name: package-runtime
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: provider-opentofu
+spec:
+  serviceAccountTemplate:
+    metadata:
+      name: provider-opentofu
+      annotations:
+        azure.workload.identity/client-id: "${PROVISIONER_CLIENT_ID}"
+        azure.workload.identity/tenant-id: "${AZURE_TENANT_ID}"
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        metadata:
+          labels:
+            azure.workload.identity/use: "true"
+        spec:
+          containers:
+            - name: package-runtime
+              args: ["--poll=5m", "--max-reconcile-rate=1", "--timeout=30m"]
+              env:
+                - name: ARM_USE_AKS_WORKLOAD_IDENTITY
+                  value: "true"
+                - name: ARM_USE_CLI
+                  value: "false"
+                - name: ARM_SUBSCRIPTION_ID
+                  value: "${AZURE_SUBSCRIPTION_ID}"
+                - name: ARM_TENANT_ID
+                  value: "${AZURE_TENANT_ID}"
+                - name: ARM_CLIENT_ID
+                  value: "${PROVISIONER_CLIENT_ID}"
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 1Gi
+                limits:
+                  memory: 4Gi
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-opentofu
+spec:
+  package: xpkg.upbound.io/upbound/provider-opentofu:${PROVIDER_OPENTOFU_VERSION}
+  runtimeConfigRef:
+    name: provider-opentofu
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-kubernetes
+spec:
+  package: xpkg.crossplane.io/crossplane-contrib/provider-kubernetes:${PROVIDER_KUBERNETES_VERSION}
+  runtimeConfigRef:
+    name: provider-kubernetes
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-go-templating
+spec:
+  package: xpkg.crossplane.io/crossplane-contrib/function-go-templating:${FUNCTION_GO_TEMPLATING_VERSION}
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-auto-ready
+spec:
+  package: xpkg.crossplane.io/crossplane-contrib/function-auto-ready:${FUNCTION_AUTO_READY_VERSION}
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-environment-configs
+  labels: {app.kubernetes.io/part-of: prel37}
+spec:
+  package: xpkg.crossplane.io/crossplane-contrib/function-environment-configs:${FUNCTION_ENVIRONMENT_CONFIGS_VERSION}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crossplane-argo-delivery
+  labels:
+    rbac.crossplane.io/aggregate-to-crossplane: "true"
+rules:
+  - apiGroups: [argoproj.io]
+    resources: [applications, appprojects]
+    verbs: [get, list, watch, create, update, patch, delete]

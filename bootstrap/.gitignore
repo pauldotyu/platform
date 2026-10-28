@@ -1,0 +1,15 @@
+app-config.local.yaml
+# Local Terraform/OpenTofu artifacts and credentials
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example
+.terraform.tfstate.lock.info
+*.tfplan
+crash.log
+crash.*.log
+
+# Keep the dependency lock file versioned
+!.terraform.lock.hcl

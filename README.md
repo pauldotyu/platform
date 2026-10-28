@@ -143,7 +143,7 @@ For the expanded contract, a request looks like:
 apiVersion: platform.example.org/v1alpha1
 kind: XAgentEnvironment
 metadata:
-  name: blue-sundae-funday-dev
+  name: blue-demo-dev
   namespace: agent-environments
 spec:
   parameters:
@@ -214,10 +214,10 @@ kubectl -n argocd get application agent-environments \
   -o jsonpath='{.status.sync.status}{"\n"}{.status.conditions}{"\n"}'
 
 kubectl -n agent-environments get xagentenvironments
-kubectl -n agent-environments describe xagentenvironment blue-sundae-funday-dev
+kubectl -n agent-environments describe xagentenviornment blue-demo-dev
 kubectl -n agent-environments get workspaces.opentofu.m.upbound.io
 
-kubectl -n agent-environments get xagentenvironment blue-sundae-funday-dev \
+kubectl -n agent-environments get xagentenviornment blue-demo-dev \
   -o jsonpath='{.status.resourceGroupId}{"\n"}'
 ```
 

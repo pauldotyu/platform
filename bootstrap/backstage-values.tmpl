@@ -1,0 +1,74 @@
+gateway:
+  enabled: true
+  className: approuting-istio
+  host: backstage.${DNS_ZONE_NAME}
+  tls:
+    enabled: true
+    certManager:
+      issuerRef:
+        name: letsencrypt-staging
+        kind: ClusterIssuer
+
+existingSecret: backstage-secrets
+
+# Read access to environments in this cluster. The namespace must already exist.
+agentEnvironments:
+  enabled: true
+  namespace: agent-environments
+
+appConfig:
+  app:
+    baseUrl: https://backstage.${DNS_ZONE_NAME}
+  backend:
+    baseUrl: https://backstage.${DNS_ZONE_NAME}
+    cors:
+      origin: https://backstage.${DNS_ZONE_NAME}
+
+  auth:
+    environment: production
+    providers:
+      microsoft:
+        production:
+          clientId: ${AZURE_CLIENT_ID}
+          clientSecret: ${AZURE_CLIENT_SECRET}
+          tenantId: ${AZURE_TENANT_ID}
+          domainHint: ${AZURE_TENANT_ID}
+          signIn:
+            resolvers:
+              - resolver: emailMatchingUserEntityAnnotation
+
+  catalog:
+    providers:
+      microsoftGraphOrg:
+        default:
+          tenantId: ${AZURE_TENANT_ID}
+          clientId: ${AZURE_CLIENT_ID}
+          clientSecret: ${AZURE_CLIENT_SECRET}
+          userGroupMember:
+            filter: id eq '${AZURE_USER_GROUP_ID}'
+          group:
+            filter: >-
+              id eq '${AZURE_USER_GROUP_ID}'
+              or id eq '${AZURE_ADMIN_GROUP_ID}'
+          schedule:
+            frequency: { minutes: 30 }
+            timeout: { minutes: 3 }
+
+
+  kubernetes:
+    serviceLocatorMethod:
+      type: singleTenant
+    customResources:
+      - group: platform.example.org
+        apiVersion: v1alpha1
+        plural: xagentenvironments
+    # Fetch configured custom resources only, not unrelated workloads or Secrets.
+    objectTypes: []
+    clusterLocatorMethods:
+      - type: config
+        clusters:
+          - name: in-cluster
+            url: https://kubernetes.default.svc
+            # Omit serviceAccountToken to use the pod's service account.
+            authProvider: serviceAccount
+            skipMetricsLookup: true

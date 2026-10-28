@@ -1,0 +1,131 @@
+resource "helm_release" "crossplane" {
+  name             = "crossplane"
+  repository       = "https://charts.crossplane.io/stable"
+  chart            = "crossplane"
+  version          = "2.4.2"
+  namespace        = "crossplane-system"
+  create_namespace = true
+
+  depends_on = [azurerm_role_assignment.control_cluster_access]
+}
+
+resource "azurerm_storage_account" "opentofu" {
+  name                            = "st${local.random_unique_name}"
+  resource_group_name             = azurerm_resource_group.example.name
+  location                        = azurerm_resource_group.example.location
+  account_tier                    = "Standard"
+  account_replication_type        = "LRS"
+  default_to_oauth_authentication = true
+  shared_access_key_enabled       = false
+}
+
+resource "azurerm_storage_container" "opentofu" {
+  name               = "tfstate"
+  storage_account_id = azurerm_storage_account.opentofu.id
+}
+
+resource "azurerm_user_assigned_identity" "opentofu" {
+  resource_group_name = azurerm_resource_group.example.name
+  location            = azurerm_resource_group.example.location
+  name                = "provider-opentofu"
+}
+
+resource "azurerm_role_assignment" "opentofu_storage_blob_data_contributor" {
+  principal_id                     = azurerm_user_assigned_identity.opentofu.principal_id
+  scope                            = azurerm_storage_account.opentofu.id
+  role_definition_name             = "Storage Blob Data Contributor"
+  skip_service_principal_aad_check = true
+}
+
+resource "azurerm_role_assignment" "opentofu_contributor" {
+  principal_id                     = azurerm_user_assigned_identity.opentofu.principal_id
+  scope                            = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  role_definition_name             = "Contributor"
+  skip_service_principal_aad_check = true
+}
+
+resource "azurerm_role_assignment" "opentofu_rbac_administrator" {
+  principal_id                     = azurerm_user_assigned_identity.opentofu.principal_id
+  scope                            = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+  role_definition_name             = "Role Based Access Control Administrator"
+  skip_service_principal_aad_check = true
+}
+
+resource "azurerm_federated_identity_credential" "opentofu" {
+  user_assigned_identity_id = azurerm_user_assigned_identity.opentofu.id
+  name                      = "provider-opentofu"
+  issuer                    = azurerm_kubernetes_cluster.control.oidc_issuer_url
+  audience                  = ["api://AzureADTokenExchange"]
+  subject                   = "system:serviceaccount:crossplane-system:provider-opentofu"
+}
+
+resource "azurerm_user_assigned_identity" "provider_kubernetes" {
+  resource_group_name = azurerm_resource_group.example.name
+  location            = azurerm_resource_group.example.location
+  name                = "provider-kubernetes"
+}
+
+resource "azurerm_federated_identity_credential" "provider_kubernetes" {
+  user_assigned_identity_id = azurerm_user_assigned_identity.provider_kubernetes.id
+  name                      = "provider-kubernetes"
+  issuer                    = azurerm_kubernetes_cluster.control.oidc_issuer_url
+  audience                  = ["api://AzureADTokenExchange"]
+  subject                   = "system:serviceaccount:crossplane-system:provider-kubernetes"
+}
+
+resource "azurerm_role_assignment" "provider_kubernetes_worker_writer" {
+  principal_id                     = azurerm_user_assigned_identity.provider_kubernetes.principal_id
+  scope                            = azapi_resource.aks_worker.id
+  role_definition_name             = "Azure Kubernetes Service RBAC Writer"
+  skip_service_principal_aad_check = true
+}
+
+resource "local_file" "opentofu_provider" {
+  filename = "kubernetes/control/crossplane.yaml"
+  content = templatefile("crossplane.tmpl",
+    {
+
+      PROVISIONER_CLIENT_ID                = azurerm_user_assigned_identity.opentofu.client_id
+      AZURE_TENANT_ID                      = data.azuread_client_config.current.tenant_id
+      AZURE_SUBSCRIPTION_ID                = data.azurerm_client_config.current.subscription_id
+      PROVIDER_OPENTOFU_VERSION            = var.crossplane_provider_opentofu_version
+      PROVIDER_KUBERNETES_VERSION          = var.crossplane_provider_kubernetes_version
+      FUNCTION_GO_TEMPLATING_VERSION       = var.crossplane_function_go_templating_version
+      FUNCTION_AUTO_READY_VERSION          = var.crossplane_function_auto_ready_version
+      FUNCTION_ENVIRONMENT_CONFIGS_VERSION = var.crossplane_function_environment_configs_version
+      SHARED_CLUSTER_ID                    = azapi_resource.aks_worker.id
+      SHARED_CLUSTER_OIDC_ISSUER_URL       = azapi_resource.aks_worker.output.properties.oidcIssuerProfile.issuerURL
+      SHARED_CLUSTER_LOCATION              = azapi_resource.aks_worker.location
+      SHARED_MONITOR_WORKSPACE_ID          = azurerm_monitor_workspace.example.id
+      SHARED_LOG_ANALYTICS_WORKSPACE_ID    = azurerm_log_analytics_workspace.example.id
+      SHARED_MODEL_RESOURCE_ID             = azurerm_cognitive_account.example.id
+      SHARED_MODEL_RESOURCE_NAME           = azurerm_cognitive_account.example.name
+      SHARED_MODEL_DEPLOYMENT_NAME         = var.model_deployment.model.name
+      PLATFORM_MODULE_REVISION             = var.platform_module_revision
+      PROVIDER_KUBERNETES_CLIENT_ID        = azurerm_user_assigned_identity.provider_kubernetes.client_id
+    }
+  )
+}
+
+resource "local_file" "opentofu_state" {
+  filename = "kubernetes/control/opentofu-state.yaml"
+  content = templatefile("opentofu-state.tmpl",
+    {
+
+      PROVISIONER_CLIENT_ID = azurerm_user_assigned_identity.opentofu.client_id
+      AZURE_TENANT_ID       = data.azuread_client_config.current.tenant_id
+      AZURE_SUBSCRIPTION_ID = data.azurerm_client_config.current.subscription_id
+      RESOURCE_GROUP_NAME   = azurerm_resource_group.example.name
+      STORAGE_ACCOUNT_NAME  = azurerm_storage_account.opentofu.name
+      CONTAINER_NAME        = azurerm_storage_container.opentofu.name
+    }
+  )
+}
+
+resource "local_file" "workload_kubernetes" {
+  filename = "kubernetes/control/workload-kubernetes.yaml"
+  content = templatefile("workload-kubernetes.tmpl", {
+    PROVIDER_KUBERNETES_CLIENT_ID = azurerm_user_assigned_identity.provider_kubernetes.client_id
+    AZURE_TENANT_ID               = data.azurerm_client_config.current.tenant_id
+  })
+}
