@@ -407,7 +407,7 @@ Do not delete live requests while leaving their Git manifests active; Argo CD se
 Only after those steps, and using the authoritative bootstrap state, review and confirm destruction:
 
 ```bash
-terraform destroy
+tofu destroy
 ```
 
 External Secrets Operator and cert-manager retain CRDs in the configured setup. Retained CRDs disappear when the cluster is deleted. No need to strip finalizers to bypass incomplete cleanup.
