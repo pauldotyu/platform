@@ -110,6 +110,14 @@ resource "azurerm_federated_identity_credential" "argocd_controller" {
   subject                   = "system:serviceaccount:argocd:argocd-application-controller"
 }
 
+resource "azurerm_federated_identity_credential" "argocd_server" {
+  user_assigned_identity_id = azurerm_user_assigned_identity.argocd_controller.id
+  name                      = "argocd-server"
+  issuer                    = azurerm_kubernetes_cluster.control.oidc_issuer_url
+  audience                  = ["api://AzureADTokenExchange"]
+  subject                   = "system:serviceaccount:argocd:argocd-server"
+}
+
 resource "azurerm_role_assignment" "argocd_controller_worker" {
   principal_id                     = azurerm_user_assigned_identity.argocd_controller.principal_id
   scope                            = azapi_resource.aks_worker.id
